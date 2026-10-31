@@ -18,7 +18,40 @@ Budget follows the envelope method popularised by YNAB: money you have is assign
 
 ## Screenshots
 
-Coming soon: screenshots go in `docs/screenshots/`.
+The monthly budget: envelopes, targets and what is left to assign.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/budget-dark.png">
+  <img alt="The monthly budget" src="docs/screenshots/budget-light.png">
+</picture>
+
+<table>
+  <tr>
+    <td><picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/accounts-dark.png">
+  <img alt="All accounts and the transactions to review" src="docs/screenshots/accounts-light.png">
+</picture></td>
+    <td><picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/loan-dark.png">
+  <img alt="A mortgage, its payments and amortization" src="docs/screenshots/loan-light.png">
+</picture></td>
+  </tr>
+  <tr>
+    <td><picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/stats-dark.png">
+  <img alt="Spending trends" src="docs/screenshots/stats-light.png">
+</picture></td>
+    <td align="center"><picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/budget-mobile-dark.png">
+  <img alt="The budget on a phone" src="docs/screenshots/budget-mobile-light.png" width="260">
+</picture> <picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/simple-view-mobile-dark.png">
+  <img alt="The read-only simple view on a phone" src="docs/screenshots/simple-view-mobile-light.png" width="260">
+</picture></td>
+  </tr>
+</table>
+
+Screenshots follow your GitHub theme (light or dark). They show the English demo data from `php artisan budget:demo --locale=en`.
 
 ## Quick start (local development)
 
@@ -50,7 +83,7 @@ Open the site: the first person to register creates the household and becomes it
 
 On a server without a browser at hand, `php artisan budget:install` creates the household and its first member from the command line.
 
-To look around with fake data, `php artisan budget:demo` fills a household with a demo budget (see `php artisan budget:demo --help`).
+To look around with fake data, `php artisan budget:demo` fills a household with a demo budget, in English, French or Spanish with `--locale` (see `php artisan budget:demo --help`).
 
 ## Self-hosting
 

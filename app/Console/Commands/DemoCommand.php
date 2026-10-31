@@ -18,6 +18,7 @@ use App\Models\MonthNote;
 use App\Models\Team;
 use App\Models\Transaction;
 use App\Models\User;
+use App\Support\Locales;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -36,7 +37,8 @@ class DemoCommand extends Command
     protected $signature = 'budget:demo
         {household? : Slug of the household (defaults to the only one)}
         {--remove : Delete every account, category and transaction of the household}
-        {--force : Remove without asking for confirmation}';
+        {--force : Remove without asking for confirmation}
+        {--locale= : Language of the demo data: en, fr or es (defaults to the app language)}';
 
     protected $description = 'Fill a household with demo budget data, or remove all its budget data';
 
@@ -48,6 +50,66 @@ class DemoCommand extends Command
 
     private User $member;
 
+    private string $locale = 'fr';
+
+    /**
+     * The demo is written in French; these are its names in the other languages.
+     *
+     * @var array<string, array<string, string>>
+     */
+    private const NAMES = [
+        'en' => [
+            'Compte joint' => 'Joint account', 'Livret A' => 'Savings account', 'Espèces' => 'Cash',
+            'Prêt immobilier' => 'Mortgage', 'Assurance vie' => 'Life insurance fund',
+            'Factures' => 'Bills', 'Dépenses courantes' => 'Everyday spending', 'Loisirs' => 'Fun', 'Épargne et projets' => 'Savings and projects',
+            'Crédit immobilier' => 'Mortgage', 'Électricité' => 'Electricity', 'Internet et mobiles' => 'Internet and phones', 'Eau' => 'Water',
+            'Assurance MAAF' => 'Home and car insurance', 'Courses' => 'Groceries', 'Essence' => 'Fuel', 'Restaurants' => 'Restaurants',
+            'Santé' => 'Health', 'Enfants' => 'Kids', 'Animaux' => 'Pets', 'Vêtements' => 'Clothing', 'Sorties' => 'Going out',
+            'Abonnements' => 'Subscriptions', 'Cadeaux' => 'Gifts', 'Sport' => 'Sport', 'Vacances' => 'Holidays',
+            'Entretien voiture' => 'Car maintenance', 'Noël' => 'Christmas', 'Imprévus' => 'Emergency fund',
+            'Épargne assurance vie' => 'Long-term savings', 'Formation' => 'Training',
+            'Salaire Alex' => 'Alex salary', 'Salaire Camille' => 'Camille salary', 'Nounou Sophie' => 'Babysitter Sophie',
+            'EDF' => 'Octopus Energy', 'Free' => 'Vodafone', 'Veolia Eau' => 'Thames Water', 'Intermarché Carburant' => 'Shell',
+            'Le Bistrot du Port' => 'The Harbour Bistro', 'Pharmacie du Centre' => 'Boots Pharmacy', 'Dr Martin' => 'Dr Martin',
+            'Cantine scolaire' => 'School canteen', 'Clinique vétérinaire' => 'Vet clinic', 'Pathé Cinéma' => 'Odeon Cinema',
+            'Boulangerie Paul' => 'Paul Bakery', 'Pull' => 'Jumper', 'Livre pour Léa' => 'Book for Lea',
+            'Anniversaire de Camille' => 'Camille’s birthday', 'Anniversaire de Camille le 18 : resto prévu.' => 'Camille’s birthday on the 18th: dinner out planned.',
+            'Décathlon' => 'Decathlon', 'Biocoop' => 'Whole Foods',
+        ],
+        'es' => [
+            'Compte joint' => 'Cuenta conjunta', 'Livret A' => 'Cuenta de ahorro', 'Espèces' => 'Efectivo',
+            'Prêt immobilier' => 'Hipoteca', 'Assurance vie' => 'Plan de ahorro',
+            'Factures' => 'Facturas', 'Dépenses courantes' => 'Gastos del día a día', 'Loisirs' => 'Ocio', 'Épargne et projets' => 'Ahorro y proyectos',
+            'Crédit immobilier' => 'Hipoteca', 'Électricité' => 'Luz', 'Internet et mobiles' => 'Internet y móviles', 'Eau' => 'Agua',
+            'Assurance MAAF' => 'Seguro de hogar y coche', 'Courses' => 'Supermercado', 'Essence' => 'Gasolina', 'Restaurants' => 'Restaurantes',
+            'Santé' => 'Salud', 'Enfants' => 'Niños', 'Animaux' => 'Mascotas', 'Vêtements' => 'Ropa', 'Sorties' => 'Salidas',
+            'Abonnements' => 'Suscripciones', 'Cadeaux' => 'Regalos', 'Sport' => 'Deporte', 'Vacances' => 'Vacaciones',
+            'Entretien voiture' => 'Mantenimiento del coche', 'Noël' => 'Navidad', 'Imprévus' => 'Imprevistos',
+            'Épargne assurance vie' => 'Ahorro a largo plazo', 'Formation' => 'Formación',
+            'Salaire Alex' => 'Nómina Alex', 'Salaire Camille' => 'Nómina Camille', 'Nounou Sophie' => 'Canguro Sofía',
+            'EDF' => 'Iberdrola', 'Free' => 'Movistar', 'Veolia Eau' => 'Canal de Isabel II', 'Intermarché Carburant' => 'Repsol',
+            'Le Bistrot du Port' => 'Bistró del Puerto', 'Pharmacie du Centre' => 'Farmacia Central', 'Dr Martin' => 'Dr. Martín',
+            'Cantine scolaire' => 'Comedor escolar', 'Clinique vétérinaire' => 'Clínica veterinaria', 'Pathé Cinéma' => 'Cines Yelmo',
+            'Boulangerie Paul' => 'Panadería Paul', 'Pull' => 'Jersey', 'Livre pour Léa' => 'Libro para Lea',
+            'Anniversaire de Camille' => 'Cumpleaños de Camille', 'Anniversaire de Camille le 18 : resto prévu.' => 'Cumpleaños de Camille el 18: cena fuera prevista.',
+            'Carrefour' => 'Mercadona', 'E.Leclerc' => 'Carrefour', 'Biocoop' => 'Ecorganic', 'Cultura' => 'Casa del Libro', 'Basic-Fit' => 'Basic-Fit',
+        ],
+    ];
+
+    /**
+     * A name of the demo in its language, with its emoji kept.
+     */
+    private function name(string $french): string
+    {
+        $emoji = '';
+
+        if (preg_match('/^([^\p{L}]+)(.*)$/u', $french, $matches) === 1) {
+            [, $emoji, $french] = $matches;
+        }
+
+        return $emoji.(self::NAMES[$this->locale][$french] ?? $french);
+    }
+
     public function handle(): int
     {
         $team = $this->household();
@@ -55,6 +117,19 @@ class DemoCommand extends Command
         if ($team === null) {
             return self::FAILURE;
         }
+
+        $locale = $this->option('locale') ?: Locales::forData();
+
+        if (! Locales::isSupported($locale)) {
+            $this->components->error("Unknown language “{$locale}”: use ".implode(', ', array_keys(Locales::SUPPORTED)).'.');
+
+            return self::FAILURE;
+        }
+
+        $this->locale = $locale;
+
+        // Names the app writes itself (starting balances, transfers) follow the demo's language.
+        config(['app.data_locale' => $locale]);
 
         return $this->option('remove') ? $this->remove($team) : $this->fill($team);
     }
@@ -132,7 +207,7 @@ class DemoCommand extends Command
             MonthNote::create([
                 'team_id' => $team->id,
                 'month' => $months[2]->toDateString(),
-                'note' => 'Anniversaire de Camille le 18 : resto prévu.',
+                'note' => $this->name('Anniversaire de Camille le 18 : resto prévu.'),
             ]);
         });
 
@@ -152,7 +227,7 @@ class DemoCommand extends Command
             ['Prêt immobilier', AccountType::Loan, -142_300_00],
             ['Assurance vie', AccountType::Investment, 12_450_00],
         ] as [$name, $type, $balance]) {
-            $this->accounts[$name] = $create->handle($this->member, $name, $type, $type->isOnBudgetByDefault(), $balance, $start);
+            $this->accounts[$name] = $create->handle($this->member, $this->name($name), $type, $type->isOnBudgetByDefault(), $balance, $start);
         }
     }
 
@@ -197,10 +272,10 @@ class DemoCommand extends Command
         ];
 
         foreach ($structure as $groupName => $categories) {
-            $group = app(CreateCategoryGroup::class)->handle($team, $groupName);
+            $group = app(CreateCategoryGroup::class)->handle($team, $this->name($groupName));
 
             foreach ($categories as $name => $target) {
-                $category = app(CreateCategory::class)->handle($group, $name);
+                $category = app(CreateCategory::class)->handle($group, $this->name($name));
                 $this->categories[$this->key($name)] = $category;
 
                 if ($target !== null) {
@@ -301,8 +376,8 @@ class DemoCommand extends Command
                 'amount' => -94_70,
                 'cleared' => true,
                 'splits' => [
-                    ['category_id' => $this->categories['vêtements']->id, 'amount' => -54_80, 'memo' => 'Pull'],
-                    ['category_id' => $this->categories['cadeaux']->id, 'amount' => -39_90, 'memo' => 'Livre pour Léa'],
+                    ['category_id' => $this->categories['vêtements']->id, 'amount' => -54_80, 'memo' => $this->name('Pull')],
+                    ['category_id' => $this->categories['cadeaux']->id, 'amount' => -39_90, 'memo' => $this->name('Livre pour Léa')],
                 ],
             ]);
         }
@@ -336,10 +411,10 @@ class DemoCommand extends Command
         return app(SaveTransaction::class)->handle($this->member, [
             'account_id' => $account->id,
             'date' => $date->toDateString(),
-            'payee_name' => $payee,
+            'payee_name' => $this->name($payee),
             'category_id' => $category ? $this->categories[$category]->id : null,
             'inflow_to_rta' => $category === null && $amount > 0,
-            'memo' => $memo,
+            'memo' => $memo === null ? null : $this->name($memo),
             'amount' => $amount,
             'cleared' => $cleared,
         ]);
