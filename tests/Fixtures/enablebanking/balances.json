@@ -1,0 +1,20 @@
+{
+  "balances": [
+    {
+      "name": "Solde comptable",
+      "balance_amount": {"currency": "EUR", "amount": "1523.45"},
+      "balance_type": "CLBD",
+      "last_change_date_time": "2026-10-29T22:00:00+00:00",
+      "reference_date": "2026-10-29",
+      "last_committed_transaction": null
+    },
+    {
+      "name": "Solde à venir",
+      "balance_amount": {"currency": "EUR", "amount": "1461.05"},
+      "balance_type": "XPCD",
+      "last_change_date_time": "2026-10-30T08:00:00+00:00",
+      "reference_date": "2026-10-30",
+      "last_committed_transaction": null
+    }
+  ]
+}

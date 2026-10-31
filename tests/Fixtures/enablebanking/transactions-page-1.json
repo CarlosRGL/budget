@@ -1,0 +1,34 @@
+{
+  "transactions": [
+    {
+      "entry_reference": "2026102200001",
+      "transaction_id": null,
+      "transaction_amount": {"currency": "EUR", "amount": "18.09"},
+      "credit_debit_indicator": "DBIT",
+      "status": "BOOK",
+      "booking_date": "2026-10-23",
+      "value_date": "2026-10-22",
+      "transaction_date": "2026-10-22",
+      "creditor": {"name": "BONNEAU BOULANG"},
+      "debtor": null,
+      "remittance_information": ["CARTE 22/10/26 BONNEAU BOULANG CB*2594"],
+      "bank_transaction_code": {"description": "Card payment", "code": "CCRD", "sub_code": "POSD"},
+      "balance_after_transaction": null,
+      "reference_number": null,
+      "note": null
+    },
+    {
+      "entry_reference": "2026102500002",
+      "transaction_amount": {"currency": "EUR", "amount": "2450.00"},
+      "credit_debit_indicator": "CRDT",
+      "status": "BOOK",
+      "booking_date": "2026-10-25",
+      "value_date": "2026-10-25",
+      "transaction_date": null,
+      "creditor": null,
+      "debtor": {"name": "EMPLOYEUR SAS"},
+      "remittance_information": ["VIR SEPA EMPLOYEUR SAS SALAIRE OCTOBRE"]
+    }
+  ],
+  "continuation_key": "c2VjcmV0LXBhZ2UtMg=="
+}

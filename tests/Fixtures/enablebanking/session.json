@@ -1,0 +1,39 @@
+{
+  "session_id": "4a5b2f6c-1e1a-4a8e-9c2d-2b8f0e6d3c11",
+  "accounts": [
+    {
+      "account_id": {"iban": "FR7630006000011234567890189"},
+      "all_account_ids": [{"identification": "FR7630006000011234567890189", "scheme_name": "IBAN"}],
+      "account_servicer": {"bic_fi": "AGRIFRPP"},
+      "name": "M ALEX MARTIN",
+      "details": "Compte de dépôt",
+      "usage": "PRIV",
+      "cash_account_type": "CACC",
+      "product": "Compte courant",
+      "currency": "EUR",
+      "psu_status": "Account Holder",
+      "credit_limit": null,
+      "legal_age": true,
+      "postal_address": null,
+      "uid": "07cc67f4-45d6-494b-adac-09b5cbc7e2b5",
+      "identification_hash": "WwpbCiAgImFjY291bnQiLAogICJpYmFuIgpdLApbCiAgImFjY291bnQiLAogICJjdXJyZW5jeSIKXQpd",
+      "identification_hashes": ["WwpbCiAgImFjY291bnQiLAogICJpYmFuIgpdLApbCiAgImFjY291bnQiLAogICJjdXJyZW5jeSIKXQpd"]
+    },
+    {
+      "account_id": {"iban": "FR7630006000019876543210123"},
+      "all_account_ids": [{"identification": "FR7630006000019876543210123", "scheme_name": "IBAN"}],
+      "name": "M ALEX MARTIN",
+      "details": "Livret A",
+      "usage": "PRIV",
+      "cash_account_type": "SVGS",
+      "product": "Livret A",
+      "currency": "EUR",
+      "uid": "8f1e5d3c-9a2b-4c7d-8e6f-1a2b3c4d5e6f",
+      "identification_hash": "c2F2aW5ncy1hY2NvdW50LWhhc2g=",
+      "identification_hashes": ["c2F2aW5ncy1hY2NvdW50LWhhc2g="]
+    }
+  ],
+  "aspsp": {"name": "Crédit Agricole", "country": "FR"},
+  "psu_type": "personal",
+  "access": {"valid_until": "2027-04-28T10:00:00.000000+00:00"}
+}

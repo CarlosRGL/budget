@@ -1,0 +1,29 @@
+{
+  "aspsps": [
+    {
+      "name": "Crédit Agricole",
+      "country": "FR",
+      "logo": "https://enablebanking.com/brands/FR/Credit_Agricole/",
+      "psu_types": ["personal"],
+      "auth_methods": [{"name": "redirect", "approach": "REDIRECT", "psu_type": "personal"}],
+      "maximum_consent_validity": 15552000,
+      "sandbox": null,
+      "beta": false,
+      "bic": "AGRIFRPP",
+      "required_psu_headers": [],
+      "payments": []
+    },
+    {
+      "name": "Boursorama",
+      "country": "FR",
+      "logo": "https://enablebanking.com/brands/FR/Boursorama/",
+      "psu_types": ["personal"],
+      "auth_methods": [{"name": "redirect", "approach": "REDIRECT", "psu_type": "personal"}],
+      "maximum_consent_validity": 7776000,
+      "beta": false,
+      "bic": "BOUSFRPP",
+      "required_psu_headers": [],
+      "payments": []
+    }
+  ]
+}

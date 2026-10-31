@@ -1,0 +1,207 @@
+{
+  "data": {
+    "category_groups": [
+      {
+        "id": "group-0",
+        "name": "Internal Master Category",
+        "hidden": false,
+        "deleted": false,
+        "categories": [
+          {
+            "id": "cat-0-0",
+            "name": "Inflow: Ready to Assign",
+            "hidden": false,
+            "deleted": false,
+            "goal_type": null,
+            "goal_target": 0,
+            "goal_target_month": null,
+            "goal_cadence": null,
+            "goal_cadence_frequency": null,
+            "goal_day": null,
+            "goal_needs_whole_amount": null,
+            "goal_snoozed_at": null
+          },
+          {
+            "id": "cat-0-1",
+            "name": "Uncategorized",
+            "hidden": false,
+            "deleted": false,
+            "goal_type": null,
+            "goal_target": 0,
+            "goal_target_month": null,
+            "goal_cadence": null,
+            "goal_cadence_frequency": null,
+            "goal_day": null,
+            "goal_needs_whole_amount": null,
+            "goal_snoozed_at": null
+          }
+        ]
+      },
+      {
+        "id": "group-1",
+        "name": "Credit Card Payments",
+        "hidden": false,
+        "deleted": false,
+        "categories": []
+      },
+      {
+        "id": "group-2",
+        "name": "Gastos Fijos",
+        "hidden": false,
+        "deleted": false,
+        "categories": [
+          {
+            "id": "cat-2-0",
+            "name": "IPTV",
+            "hidden": false,
+            "deleted": false,
+            "goal_type": null,
+            "goal_target": 0,
+            "goal_target_month": null,
+            "goal_cadence": null,
+            "goal_cadence_frequency": null,
+            "goal_day": null,
+            "goal_needs_whole_amount": null,
+            "goal_snoozed_at": null
+          },
+          {
+            "id": "cat-2-1",
+            "name": "🏡 Crédit Maison",
+            "hidden": false,
+            "deleted": false,
+            "goal_type": "DEBT",
+            "goal_target": 937400,
+            "goal_target_month": null,
+            "goal_cadence": 1,
+            "goal_cadence_frequency": 1,
+            "goal_day": 5,
+            "goal_needs_whole_amount": null,
+            "goal_snoozed_at": null
+          },
+          {
+            "id": "cat-2-2",
+            "name": "🍱 Courses",
+            "hidden": false,
+            "deleted": false,
+            "goal_type": "NEED",
+            "goal_target": 650000,
+            "goal_target_month": null,
+            "goal_cadence": 1,
+            "goal_cadence_frequency": 1,
+            "goal_day": 1,
+            "goal_needs_whole_amount": false,
+            "goal_snoozed_at": null
+          },
+          {
+            "id": "cat-2-3",
+            "name": "🚙  Crédit Duster",
+            "hidden": true,
+            "deleted": false,
+            "goal_type": null,
+            "goal_target": 0,
+            "goal_target_month": null,
+            "goal_cadence": null,
+            "goal_cadence_frequency": null,
+            "goal_day": null,
+            "goal_needs_whole_amount": null,
+            "goal_snoozed_at": null
+          },
+          {
+            "id": "cat-2-4",
+            "name": "📄 MAAF",
+            "hidden": false,
+            "deleted": false,
+            "goal_type": "NEED",
+            "goal_target": 1600000,
+            "goal_target_month": "2025-12-01",
+            "goal_cadence": 13,
+            "goal_cadence_frequency": 1,
+            "goal_day": null,
+            "goal_needs_whole_amount": true,
+            "goal_snoozed_at": null
+          },
+          {
+            "id": "cat-2-5",
+            "name": "🧼 Ménage",
+            "hidden": false,
+            "deleted": false,
+            "goal_type": "NEED",
+            "goal_target": 100000,
+            "goal_target_month": null,
+            "goal_cadence": 1,
+            "goal_cadence_frequency": 1,
+            "goal_day": null,
+            "goal_needs_whole_amount": true,
+            "goal_snoozed_at": null
+          }
+        ]
+      },
+      {
+        "id": "group-4",
+        "name": "Quality of Life Goals",
+        "hidden": false,
+        "deleted": false,
+        "categories": [
+          {
+            "id": "cat-4-0",
+            "name": "🍻 Sorties",
+            "hidden": false,
+            "deleted": false,
+            "goal_type": "MF",
+            "goal_target": 50000,
+            "goal_target_month": null,
+            "goal_cadence": null,
+            "goal_cadence_frequency": null,
+            "goal_day": null,
+            "goal_needs_whole_amount": null,
+            "goal_snoozed_at": "2026-10-18T09:06:31.356Z"
+          }
+        ]
+      },
+      {
+        "id": "group-5",
+        "name": "Epargne",
+        "hidden": false,
+        "deleted": false,
+        "categories": [
+          {
+            "id": "cat-5-0",
+            "name": "💴 Livret A Juliette",
+            "hidden": false,
+            "deleted": false,
+            "goal_type": "MF",
+            "goal_target": 30000,
+            "goal_target_month": null,
+            "goal_cadence": 1,
+            "goal_cadence_frequency": 1,
+            "goal_day": null,
+            "goal_needs_whole_amount": null,
+            "goal_snoozed_at": null
+          },
+          {
+            "id": "cat-5-1",
+            "name": "🏦 fond de secours",
+            "hidden": false,
+            "deleted": false,
+            "goal_type": "TB",
+            "goal_target": 12000000,
+            "goal_target_month": null,
+            "goal_cadence": null,
+            "goal_cadence_frequency": null,
+            "goal_day": null,
+            "goal_needs_whole_amount": null,
+            "goal_snoozed_at": null
+          }
+        ]
+      },
+      {
+        "id": "group-6",
+        "name": "Hidden Categories",
+        "hidden": false,
+        "deleted": false,
+        "categories": []
+      }
+    ],
+    "server_knowledge": 1
+  }
+}

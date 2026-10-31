@@ -1,0 +1,17 @@
+{
+  "transactions": [
+    {
+      "entry_reference": null,
+      "transaction_id": "pdng-778899",
+      "transaction_amount": {"currency": "EUR", "amount": "62.40"},
+      "credit_debit_indicator": "DBIT",
+      "status": "PDNG",
+      "booking_date": null,
+      "value_date": null,
+      "transaction_date": "2026-10-28",
+      "creditor": {"name": "TOTALENERGIES"},
+      "remittance_information": ["CARTE 28/10/26 TOTALENERGIES RELAIS CB*7812"]
+    }
+  ],
+  "continuation_key": null
+}

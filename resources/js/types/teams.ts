@@ -1,0 +1,61 @@
+export type TeamRole = 'owner' | 'admin' | 'member' | 'viewer';
+
+export type Team = {
+    id: number;
+    name: string;
+    slug: string;
+    isPersonal: boolean;
+    role?: TeamRole;
+    roleLabel?: string;
+    isCurrent?: boolean;
+};
+
+export type TeamMember = {
+    id: number;
+    name: string;
+    email: string;
+    avatar?: string | null;
+    role: TeamRole;
+    role_label: string;
+};
+
+export type TeamInvitation = {
+    code: string;
+    email: string;
+    role: TeamRole;
+    role_label: string;
+    created_at: string;
+    /** Link to share by hand (message, WhatsApp…). */
+    url: string;
+    expires_at: string | null;
+};
+
+export type TeamInvitationContext = {
+    code: string;
+    teamName: string;
+    email: string;
+};
+
+export type DashboardInvitation = {
+    code: string;
+    inviterName: string;
+    team: {
+        name: string;
+        slug: string;
+    };
+};
+
+export type TeamPermissions = {
+    canUpdateTeam: boolean;
+    canDeleteTeam: boolean;
+    canAddMember: boolean;
+    canUpdateMember: boolean;
+    canRemoveMember: boolean;
+    canCreateInvitation: boolean;
+    canCancelInvitation: boolean;
+};
+
+export type RoleOption = {
+    value: TeamRole;
+    label: string;
+};
