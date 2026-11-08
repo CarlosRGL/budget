@@ -251,6 +251,37 @@ class SaveTransactionTest extends TestCase
         $this->assertSame(0, Transaction::count());
     }
 
+    public function test_changing_the_payee_deletes_the_payee_left_unused()
+    {
+        $raw = Payee::factory()->for($this->team)->create(['name' => 'LECLERC\\PERPIGNAN\\ FR']);
+        $stillUsed = Payee::factory()->for($this->team)->create(['name' => 'Carrefour']);
+        $transaction = Transaction::factory()->for($this->team)->for($this->checking)->create(['payee_id' => $raw->id]);
+        $other = Transaction::factory()->for($this->team)->for($this->checking)->create(['payee_id' => $stillUsed->id]);
+        Transaction::factory()->for($this->team)->for($this->checking)->create(['payee_id' => $stillUsed->id]);
+
+        foreach ([$transaction, $other] as $edited) {
+            $this->patch($this->url('transactions.update', $edited), [
+                'account_id' => $this->checking->id,
+                'date' => '2026-10-22',
+                'payee_name' => 'Leclerc',
+                'amount' => -18_09,
+            ])->assertSessionHasNoErrors();
+        }
+
+        $this->assertModelMissing($raw);
+        $this->assertModelExists($stillUsed);
+    }
+
+    public function test_deleting_a_transaction_deletes_its_payee_left_unused()
+    {
+        $payee = Payee::factory()->for($this->team)->create();
+        $transaction = Transaction::factory()->for($this->team)->for($this->checking)->create(['payee_id' => $payee->id]);
+
+        $this->delete($this->url('transactions.destroy', $transaction))->assertRedirect();
+
+        $this->assertModelMissing($payee);
+    }
+
     public function test_approving_several_transactions_at_once()
     {
         $first = Transaction::factory()->for($this->team)->for($this->checking)->create(['approved_at' => null]);

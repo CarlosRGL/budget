@@ -135,6 +135,7 @@ function EditPayeeDialog({
                         }
                         pickers={pickers}
                         errors={form.errors as Record<string, string>}
+                        payee={{ id: payee.id, name: form.data.name }}
                     />
 
                     <DialogFooter>

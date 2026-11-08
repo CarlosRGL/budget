@@ -146,6 +146,39 @@ class ManagePayeesTest extends TestCase
         $this->assertNull($transaction->refresh()->payee_id);
     }
 
+    public function test_a_rule_groups_the_payees_whose_name_it_matches()
+    {
+        $leclerc = Payee::factory()->for($this->team)->create(['name' => 'Leclerc']);
+        $raw = Payee::factory()->for($this->team)->create(['name' => 'LECLERC\\PERPIGNAN\\ FR']);
+        $typed = Transaction::factory()->for($this->team)->create(['payee_id' => $raw->id, 'raw_label' => null]);
+        $unrelated = Payee::factory()->for($this->team)->create(['name' => 'Lidl']);
+
+        $this->patch(route('payees.update', [$this->team, $leclerc]), [
+            'name' => 'Leclerc',
+            'rules' => ['leclerc\\perpignan'],
+            'apply_to_existing' => true,
+        ])->assertSessionHasNoErrors();
+
+        $this->assertModelMissing($raw);
+        $this->assertSame($leclerc->id, $typed->refresh()->payee_id);
+        $this->assertModelExists($unrelated);
+    }
+
+    public function test_a_rule_groups_nothing_unless_applied()
+    {
+        $leclerc = Payee::factory()->for($this->team)->create(['name' => 'Leclerc']);
+        $raw = Payee::factory()->for($this->team)->create(['name' => 'LECLERC PERPIGNAN']);
+        Transaction::factory()->for($this->team)->create(['payee_id' => $raw->id]);
+
+        $this->patch(route('payees.update', [$this->team, $leclerc]), [
+            'name' => 'Leclerc',
+            'rules' => ['LECLERC PERPIGNAN'],
+            'apply_to_existing' => false,
+        ])->assertSessionHasNoErrors();
+
+        $this->assertModelExists($raw);
+    }
+
     public function test_another_households_payees_cannot_be_touched()
     {
         $stranger = User::factory()->create();

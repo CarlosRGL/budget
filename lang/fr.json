@@ -1171,5 +1171,6 @@
     "Payee settings": "Réglages du bénéficiaire",
     "New payee": "Nouveau bénéficiaire",
     "Contains “:text”": "Contient « :text »",
-    "Applies to all the transactions of “:name”, saved with this one.": "S’applique à toutes les opérations de « :name », enregistré avec celle-ci."
+    "Applies to all the transactions of “:name”, saved with this one.": "S’applique à toutes les opérations de « :name », enregistré avec celle-ci.",
+    "Also groups here: :names": "Regroupe aussi ici : :names"
 }

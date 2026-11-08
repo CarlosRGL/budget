@@ -38,6 +38,30 @@ class Payee extends Model
     }
 
     /**
+     * Delete the given payees that nothing uses any more: no transaction, no
+     * split line, no rename rule. Transfer payees are kept.
+     *
+     * @param  iterable<int|null>  $ids
+     * @return int How many payees were deleted.
+     */
+    public static function deleteUnused(iterable $ids): int
+    {
+        $ids = array_values(array_unique(array_filter([...$ids])));
+
+        if ($ids === []) {
+            return 0;
+        }
+
+        return static::withoutGlobalScopes()
+            ->whereKey($ids)
+            ->whereNull('transfer_account_id')
+            ->whereDoesntHave('transactions', fn ($query) => $query->withoutGlobalScopes())
+            ->whereDoesntHave('splits')
+            ->whereDoesntHave('renameRules', fn ($query) => $query->withoutGlobalScopes())
+            ->delete();
+    }
+
+    /**
      * @return BelongsTo<Category, $this>
      */
     public function lastCategory(): BelongsTo
@@ -59,6 +83,14 @@ class Payee extends Model
     public function transactions(): HasMany
     {
         return $this->hasMany(Transaction::class);
+    }
+
+    /**
+     * @return HasMany<TransactionSplit, $this>
+     */
+    public function splits(): HasMany
+    {
+        return $this->hasMany(TransactionSplit::class);
     }
 
     /**

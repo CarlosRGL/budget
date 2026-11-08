@@ -42,23 +42,31 @@ class PayeeRenameRule extends Model
     }
 
     /**
-     * Give the rule's payee to the imported transactions of the household it matches.
+     * Give the rule's payee to the imported transactions of the household it
+     * matches. The payees this leaves unused are deleted.
      *
      * @return int How many transactions changed payee.
      */
     public function applyToExisting(): int
     {
-        $ids = Transaction::withoutGlobalScope(CurrentTeamScope::class)
+        $matching = Transaction::withoutGlobalScope(CurrentTeamScope::class)
             ->where('team_id', $this->team_id)
             ->whereNotNull('raw_label')
             ->whereNull('transfer_pair_id')
             ->where(fn (Builder $query) => $query->whereNull('payee_id')->orWhere('payee_id', '!=', $this->payee_id))
-            ->get(['id', 'raw_label'])
-            ->filter(fn (Transaction $transaction) => $this->matches((string) $transaction->raw_label))
-            ->modelKeys();
+            ->get(['id', 'raw_label', 'payee_id'])
+            ->filter(fn (Transaction $transaction) => $this->matches((string) $transaction->raw_label));
 
-        return $ids === [] ? 0 : Transaction::withoutGlobalScope(CurrentTeamScope::class)
-            ->whereKey($ids)
+        if ($matching->isEmpty()) {
+            return 0;
+        }
+
+        $changed = Transaction::withoutGlobalScope(CurrentTeamScope::class)
+            ->whereKey($matching->modelKeys())
             ->update(['payee_id' => $this->payee_id]);
+
+        Payee::deleteUnused($matching->pluck('payee_id'));
+
+        return $changed;
     }
 }

@@ -38,6 +38,7 @@ class SaveTransaction
             $account = Account::findOrFail($data['account_id']);
             $transferTo = isset($data['transfer_account_id']) ? Account::findOrFail($data['transfer_account_id']) : null;
             $pair = $this->keepPairIfStillValid($transaction, $transferTo);
+            $previousPayeeId = $transaction?->payee_id;
 
             $splits = $transferTo ? [] : ($data['splits'] ?? []);
             $leavesBudget = $transferTo && $account->on_budget && ! $transferTo->on_budget;
@@ -83,6 +84,10 @@ class SaveTransaction
 
             if ($transferTo) {
                 $this->saveOtherSide($by, $transaction, $account, $transferTo, $pair);
+            }
+
+            if ($previousPayeeId !== null && $previousPayeeId !== $payeeId) {
+                Payee::deleteUnused([$previousPayeeId]);
             }
 
             if ($payeeId && $categoryId && ! $transferTo) {

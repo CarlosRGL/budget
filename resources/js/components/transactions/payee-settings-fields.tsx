@@ -48,7 +48,40 @@ type Props = {
     errorPrefix?: string;
     /** A bank label worth offering as a rule in one click. */
     suggestedRule?: string | null;
+    /** The payee being set up, left out of the payees its rules group. */
+    payee: { id: number | null; name: string };
 };
+
+/** Uppercase, single-spaced, as the server compares labels. */
+function normalizeLabel(text: string): string {
+    return text.trim().replace(/\s+/gu, ' ').toLocaleUpperCase();
+}
+
+/**
+ * The other payees whose name contains one of the rule texts: saving with
+ * "apply" merges them into the payee, as the server does.
+ */
+export function payeesCoveredBy(
+    rules: string[],
+    payee: { id: number | null; name: string },
+    pickers: TransactionPickers,
+): TransactionPickers['payees'] {
+    const needles = rules
+        .map(normalizeLabel)
+        .filter((text) => text.length >= 2);
+    const ownName = normalizeLabel(payee.name);
+
+    return needles.length === 0
+        ? []
+        : pickers.payees.filter(
+              (other) =>
+                  other.id !== payee.id &&
+                  normalizeLabel(other.name) !== ownName &&
+                  needles.some((needle) =>
+                      normalizeLabel(other.name).includes(needle),
+                  ),
+          );
+}
 
 /**
  * How a payee categorizes, the bank labels it takes over, and whether to run
@@ -62,7 +95,10 @@ export function PayeeSettingsFields({
     errors = {},
     errorPrefix = '',
     suggestedRule = null,
+    payee,
 }: Props) {
+    const covered = payeesCoveredBy(value.rules, payee, pickers);
+
     const setRule = (index: number, text: string) =>
         onChange({
             rules: value.rules.map((rule, i) => (i === index ? text : rule)),
@@ -224,6 +260,17 @@ export function PayeeSettingsFields({
                             'Renames those that match the rules and gives the category to those that have none.',
                         )}
                     </span>
+                    {value.applyToExisting && covered.length > 0 && (
+                        <span className="mt-1.5 block text-xs">
+                            {t('Also groups here: :names', {
+                                names: covered
+                                    .map((other) =>
+                                        t('“:name”', { name: other.name }),
+                                    )
+                                    .join(', '),
+                            })}
+                        </span>
+                    )}
                 </span>
             </label>
         </>

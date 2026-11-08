@@ -7,6 +7,7 @@ use App\Actions\Transactions\SaveTransaction;
 use App\Enums\PayeeCategoryMode;
 use App\Http\Requests\Transactions\ApproveTransactionsRequest;
 use App\Http\Requests\Transactions\SaveTransactionRequest;
+use App\Models\Payee;
 use App\Models\Team;
 use App\Models\Transaction;
 use Illuminate\Http\RedirectResponse;
@@ -45,6 +46,7 @@ class TransactionController extends Controller
             $transaction->update(['transfer_pair_id' => null]);
             $pair?->delete();
             $transaction->delete();
+            Payee::deleteUnused([$transaction->payee_id]);
         });
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Transaction deleted.')]);

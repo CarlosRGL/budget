@@ -530,6 +530,10 @@ export function TransactionEditor({
                                         pickers={pickers}
                                         errors={errors}
                                         errorPrefix="payee_settings."
+                                        payee={{
+                                            id: state.payeeId,
+                                            name: state.payeeName,
+                                        }}
                                         suggestedRule={
                                             transaction?.imported
                                                 ? (transaction.payee?.name ??

@@ -5,10 +5,7 @@ namespace App\Http\Controllers;
 use App\Actions\Transactions\ConfigurePayee;
 use App\Enums\PayeeCategoryMode;
 use App\Models\Payee;
-use App\Models\PayeeRenameRule;
 use App\Models\Team;
-use App\Models\Transaction;
-use App\Models\TransactionSplit;
 use App\Support\TransactionRegister;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -74,7 +71,7 @@ class PayeeController extends Controller
         $kept = DB::transaction(function () use ($validated, $payee, $existing, $name, $configure) {
             if ($existing) {
                 $existing->update(['last_category_id' => $validated['category_id'] ?? $existing->last_category_id]);
-                $this->merge($payee, $existing);
+                $configure->merge($payee, $existing);
                 $kept = $existing;
             } else {
                 $payee->update(['name' => $name, 'last_category_id' => $validated['category_id'] ?? null]);
@@ -106,7 +103,7 @@ class PayeeController extends Controller
     /**
      * Fold several payees into one: their transactions and rules move to it.
      */
-    public function mergeMany(Request $request, Team $current_team): RedirectResponse
+    public function mergeMany(Request $request, Team $current_team, ConfigurePayee $configure): RedirectResponse
     {
         $inHousehold = Rule::exists('payees', 'id')->where('team_id', $current_team->id)->whereNull('transfer_account_id');
 
@@ -120,7 +117,7 @@ class PayeeController extends Controller
         $sources = Payee::query()->whereKey($validated['ids'])->whereKeyNot($into->id)->get();
 
         foreach ($sources as $source) {
-            $this->merge($source, $into);
+            $configure->merge($source, $into);
         }
 
         Inertia::flash('toast', ['type' => 'success', 'message' => match ($sources->count()) {
@@ -143,20 +140,5 @@ class PayeeController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Payee deleted.')]);
 
         return back();
-    }
-
-    private function merge(Payee $source, Payee $into): void
-    {
-        DB::transaction(function () use ($source, $into) {
-            Transaction::query()->where('payee_id', $source->id)->update(['payee_id' => $into->id]);
-            TransactionSplit::query()->where('payee_id', $source->id)->update(['payee_id' => $into->id]);
-            PayeeRenameRule::query()->where('payee_id', $source->id)->update(['payee_id' => $into->id]);
-
-            if ($into->last_category_id === null && $source->last_category_id !== null) {
-                $into->update(['last_category_id' => $source->last_category_id]);
-            }
-
-            $source->delete();
-        });
     }
 }
