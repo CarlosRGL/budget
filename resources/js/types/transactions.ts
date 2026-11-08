@@ -52,9 +52,21 @@ export type PickerCategoryGroup = NamedRef & {
     categories: PickerCategory[];
 };
 
+/** How a payee picks the category of its new transactions. */
+export type CategoryMode = 'history' | 'fixed' | 'none';
+
 export type TransactionPickers = {
     readyToAssign: number;
-    payees: Array<NamedRef & { lastCategoryId: number | null }>;
+    payees: Array<
+        NamedRef & {
+            /** The category its new transactions get, if any. */
+            lastCategoryId: number | null;
+            /** The category stored on the payee, whatever its mode. */
+            categoryId: number | null;
+            categoryMode: CategoryMode;
+            rules: string[];
+        }
+    >;
     categoryGroups: PickerCategoryGroup[];
     accounts: Array<AccountRef & { closed: boolean }>;
 };

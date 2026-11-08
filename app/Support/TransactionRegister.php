@@ -63,9 +63,17 @@ class TransactionRegister
             'readyToAssign' => $budget->readyToAssign,
             'payees' => Payee::query()
                 ->whereNull('transfer_account_id')
+                ->with('renameRules:id,payee_id,contains')
                 ->orderBy('name')
                 ->get(['id', 'name', 'last_category_id', 'category_mode'])
-                ->map(fn (Payee $payee) => ['id' => $payee->id, 'name' => $payee->name, 'lastCategoryId' => $payee->defaultCategoryId()])
+                ->map(fn (Payee $payee) => [
+                    'id' => $payee->id,
+                    'name' => $payee->name,
+                    'lastCategoryId' => $payee->defaultCategoryId(),
+                    'categoryId' => $payee->last_category_id,
+                    'categoryMode' => $payee->category_mode->value,
+                    'rules' => array_values($payee->renameRules->sortBy('contains')->pluck('contains')->all()),
+                ])
                 ->all(),
             'categoryGroups' => CategoryGroup::query()
                 ->with('categories')

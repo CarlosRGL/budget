@@ -2,10 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Transactions\ConfigurePayee;
 use App\Actions\Transactions\SaveTransaction;
+use App\Enums\PayeeCategoryMode;
 use App\Http\Requests\Transactions\ApproveTransactionsRequest;
 use App\Http\Requests\Transactions\SaveTransactionRequest;
-use App\Models\PayeeRenameRule;
 use App\Models\Team;
 use App\Models\Transaction;
 use Illuminate\Http\RedirectResponse;
@@ -19,18 +20,20 @@ use Inertia\Inertia;
  */
 class TransactionController extends Controller
 {
-    public function store(SaveTransactionRequest $request, SaveTransaction $save): RedirectResponse
+    public function store(SaveTransactionRequest $request, SaveTransaction $save, ConfigurePayee $configure): RedirectResponse
     {
-        $save->handle($request->user(), $request->transaction());
+        $transaction = $save->handle($request->user(), $request->transaction());
+
+        $this->configurePayee($request, $transaction, $configure);
 
         return back();
     }
 
-    public function update(SaveTransactionRequest $request, Team $current_team, Transaction $transaction, SaveTransaction $save): RedirectResponse
+    public function update(SaveTransactionRequest $request, Team $current_team, Transaction $transaction, SaveTransaction $save, ConfigurePayee $configure): RedirectResponse
     {
         $transaction = $save->handle($request->user(), $request->transaction(), $transaction);
 
-        $this->rememberRenameRule($request, $transaction);
+        $this->configurePayee($request, $transaction, $configure);
 
         return back();
     }
@@ -71,21 +74,36 @@ class TransactionController extends Controller
     }
 
     /**
-     * Renaming the payee of an imported transaction may create a rule for the next imports.
+     * The member may set up the payee while saving: how it categorizes and the
+     * bank labels it takes over, optionally run on the transactions already imported.
      */
-    private function rememberRenameRule(SaveTransactionRequest $request, Transaction $transaction): void
+    private function configurePayee(SaveTransactionRequest $request, Transaction $transaction, ConfigurePayee $configure): void
     {
-        $contains = trim((string) $request->validated('rename_rule_contains'));
+        $settings = $request->payeeSettings();
+        $payee = $transaction->payee;
 
-        if ($contains === '' || ! $transaction->isImported() || $transaction->payee_id === null) {
+        if ($settings === null || $payee === null || $payee->isTransfer()) {
             return;
         }
 
-        PayeeRenameRule::updateOrCreate(
-            ['team_id' => $transaction->team_id, 'contains' => $contains],
-            ['payee_id' => $transaction->payee_id],
-        );
+        $mode = $settings['category_mode'];
 
-        Inertia::flash('toast', ['type' => 'success', 'message' => __('Rule created: labels containing “:text” will be renamed.', ['text' => $contains])]);
+        $changed = DB::transaction(function () use ($payee, $mode, $settings, $transaction, $configure) {
+            $payee->update([
+                'category_mode' => $mode,
+                'last_category_id' => match ($mode) {
+                    PayeeCategoryMode::Fixed => $settings['category_id'],
+                    default => $transaction->category_id ?? $payee->last_category_id,
+                },
+            ]);
+
+            $configure->syncRules($payee, $settings['rules']);
+
+            return $settings['apply_to_existing'] ? $configure->applyToExisting($payee) : 0;
+        });
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => $changed > 0
+            ? trans_choice('Payee updated, :count transaction changed.|Payee updated, :count transactions changed.', $changed)
+            : __('Payee updated.')]);
     }
 }

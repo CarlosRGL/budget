@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Transactions;
 
+use App\Enums\PayeeCategoryMode;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -31,7 +32,12 @@ class SaveTransactionRequest extends FormRequest
             'splits.*.inflow_to_rta' => ['boolean'],
             'splits.*.memo' => ['nullable', 'string', 'max:255'],
             'splits.*.amount' => ['required', 'integer', 'between:-100000000000,100000000000'],
-            'rename_rule_contains' => ['nullable', 'string', 'max:255'],
+            'payee_settings' => ['nullable', 'array'],
+            'payee_settings.category_mode' => ['required_with:payee_settings', Rule::enum(PayeeCategoryMode::class)],
+            'payee_settings.category_id' => ['nullable', 'integer', $this->inHousehold('categories')],
+            'payee_settings.rules' => ['array', 'max:50'],
+            'payee_settings.rules.*' => ['required', 'string', 'min:2', 'max:255'],
+            'payee_settings.apply_to_existing' => ['boolean'],
         ];
     }
 
@@ -79,6 +85,8 @@ class SaveTransactionRequest extends FormRequest
             'category_id' => __('category'),
             'memo' => __('memo'),
             'amount' => __('amount'),
+            'payee_settings.category_id' => __('category'),
+            'payee_settings.rules.*' => __('label text'),
         ];
     }
 
@@ -124,6 +132,29 @@ class SaveTransactionRequest extends FormRequest
                 'memo' => $optionalString($split['memo'] ?? null),
                 'amount' => (int) $split['amount'],
             ], $splits)),
+        ];
+    }
+
+    /**
+     * How the payee of the transaction should categorize and which bank labels
+     * it takes over, when the member changed them while saving.
+     *
+     * @return array{category_mode: PayeeCategoryMode, category_id: int|null, rules: list<string>, apply_to_existing: bool}|null
+     */
+    public function payeeSettings(): ?array
+    {
+        if (! $this->filled('payee_settings')) {
+            return null;
+        }
+
+        /** @var array<int, string> $rules */
+        $rules = $this->safe()['payee_settings']['rules'] ?? [];
+
+        return [
+            'category_mode' => $this->enum('payee_settings.category_mode', PayeeCategoryMode::class) ?? PayeeCategoryMode::History,
+            'category_id' => $this->filled('payee_settings.category_id') ? $this->integer('payee_settings.category_id') : null,
+            'rules' => array_values(array_map('strval', $rules)),
+            'apply_to_existing' => $this->boolean('payee_settings.apply_to_existing'),
         ];
     }
 

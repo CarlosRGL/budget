@@ -3,6 +3,7 @@
 namespace Tests\Feature\Banking;
 
 use App\Enums\BankStatus;
+use App\Enums\PayeeCategoryMode;
 use App\Enums\ReviewReason;
 use App\Models\Account;
 use App\Models\Category;
@@ -100,34 +101,59 @@ class ImportedTransactionsTest extends TestCase
         $this->assertNull($imported->review_reason);
     }
 
-    public function test_renaming_an_imported_payee_can_create_a_rename_rule(): void
+    public function test_saving_a_transaction_can_set_up_its_payee(): void
     {
-        $imported = $this->imported();
+        $courses = Category::factory()->for($this->team)->create();
+        $imported = $this->imported(['raw_label' => 'CARTE 22/10/26 BONNEAU BOULANG CB*2594']);
+        $sameBakery = $this->imported(['raw_label' => 'CARTE 25/10/26 BONNEAU BOULANG CB*2594', 'fingerprint' => 'fp-2', 'external_id' => 'E2']);
 
         $this->patch(route('transactions.update', ['current_team' => $this->team, 'transaction' => $imported]), [
             'account_id' => $this->checking->id,
             'date' => '2026-10-22',
             'payee_name' => 'Boulangerie Bonneau',
             'amount' => -1809,
-            'rename_rule_contains' => 'BONNEAU BOULANG',
-        ])->assertSessionHasNoErrors();
+            'payee_settings' => [
+                'category_mode' => 'fixed',
+                'category_id' => $courses->id,
+                'rules' => ['BONNEAU'],
+                'apply_to_existing' => true,
+            ],
+        ])->assertSessionHasNoErrors()->assertInertiaFlash('toast.message', 'Payee updated, 3 transactions changed.');
 
-        $rule = PayeeRenameRule::sole();
-        $this->assertSame('BONNEAU BOULANG', $rule->contains);
-        $this->assertSame('Boulangerie Bonneau', $rule->payee->name);
-        $this->assertSame($rule->payee_id, $imported->refresh()->payee_id);
+        $payee = $imported->refresh()->payee;
+        $this->assertSame('Boulangerie Bonneau', $payee->name);
+        $this->assertSame(PayeeCategoryMode::Fixed, $payee->category_mode);
+        $this->assertSame($courses->id, $payee->last_category_id);
+        $this->assertSame(['BONNEAU'], $payee->renameRules()->pluck('contains')->all());
+        $this->assertSame($payee->id, $sameBakery->refresh()->payee_id);
+        $this->assertSame($courses->id, $sameBakery->category_id);
+        $this->assertNull(Payee::query()->where('name', 'BONNEAU BOULANG')->first());
     }
 
-    public function test_no_rule_is_created_for_a_typed_transaction(): void
+    public function test_payee_settings_reject_a_category_of_another_household(): void
     {
-        $typed = Transaction::factory()->for($this->team)->for($this->checking)->create();
+        $imported = $this->imported();
+        $foreign = Category::factory()->for(User::factory()->create()->currentTeam)->create();
 
-        $this->patch(route('transactions.update', ['current_team' => $this->team, 'transaction' => $typed]), [
+        $this->patch(route('transactions.update', ['current_team' => $this->team, 'transaction' => $imported]), [
             'account_id' => $this->checking->id,
             'date' => '2026-10-22',
-            'payee_name' => 'Boulangerie Bonneau',
             'amount' => -1809,
-            'rename_rule_contains' => 'BONNEAU',
+            'payee_settings' => ['category_mode' => 'fixed', 'category_id' => $foreign->id],
+        ])->assertSessionHasErrors('payee_settings.category_id');
+    }
+
+    public function test_payee_settings_are_ignored_for_a_transfer(): void
+    {
+        $imported = $this->imported();
+        $savings = Account::factory()->for($this->team)->create();
+
+        $this->patch(route('transactions.update', ['current_team' => $this->team, 'transaction' => $imported]), [
+            'account_id' => $this->checking->id,
+            'date' => '2026-10-22',
+            'transfer_account_id' => $savings->id,
+            'amount' => -1809,
+            'payee_settings' => ['category_mode' => 'none', 'rules' => ['BONNEAU']],
         ])->assertSessionHasNoErrors();
 
         $this->assertSame(0, PayeeRenameRule::count());

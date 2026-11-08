@@ -1,12 +1,17 @@
 import { router, usePage } from '@inertiajs/react';
-import { Plus, Trash2, X } from 'lucide-react';
+import { ChevronDown, Plus, Settings2, Trash2, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { Money } from '@/components/money';
-import { CategoryPicker } from '@/components/transactions/category-picker';
+import {
+    CategoryPicker,
+    categoryLabel,
+} from '@/components/transactions/category-picker';
 import type { CategoryValue } from '@/components/transactions/category-picker';
 import { PayeePicker } from '@/components/transactions/payee-picker';
 import type { PayeeValue } from '@/components/transactions/payee-picker';
+import { PayeeSettingsFields } from '@/components/transactions/payee-settings-fields';
+import type { PayeeSettings } from '@/components/transactions/payee-settings-fields';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -28,7 +33,7 @@ import {
 } from '@/components/ui/select';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { todayIso } from '@/lib/dates';
-import { t, tc } from '@/lib/i18n';
+import { intlLocale, t, tc } from '@/lib/i18n';
 import { moneyToInput, parseMoney } from '@/lib/money';
 import { cn } from '@/lib/utils';
 import { destroy, store, update } from '@/routes/transactions';
@@ -51,10 +56,10 @@ type EditorState = PayeeValue &
         amountText: string;
         cleared: boolean;
         splits: SplitLine[] | null;
-        /** Imported transactions: remember the new payee for this bank label. */
-        createRule: boolean;
-        ruleContains: string;
     };
+
+/** The payee settings being edited, with what they were when opened. */
+type OpenPayeeSettings = { value: PayeeSettings; initial: string };
 
 type Props = {
     /** The transaction being edited, or null to type a new one. */
@@ -113,8 +118,6 @@ function initialState(
             amountText: '',
             cleared: false,
             splits: null,
-            createRule: false,
-            ruleContains: '',
         };
     }
 
@@ -142,9 +145,63 @@ function initialState(
                       ...amountFields(split.amount),
                   }))
                 : null,
-        createRule: false,
-        ruleContains: transaction.payee?.name ?? transaction.rawLabel ?? '',
     };
+}
+
+/** The existing payee picked or typed, if any. */
+function chosenPayee(state: EditorState, pickers: TransactionPickers) {
+    const typed = state.payeeName.trim().toLocaleLowerCase(intlLocale());
+
+    return pickers.payees.find((candidate) =>
+        state.payeeId !== null
+            ? candidate.id === state.payeeId
+            : candidate.name.toLocaleLowerCase(intlLocale()) === typed,
+    );
+}
+
+/** The current settings of the chosen payee; defaults for a new one. */
+function payeeSettingsOf(
+    state: EditorState,
+    pickers: TransactionPickers,
+): PayeeSettings {
+    const payee = chosenPayee(state, pickers);
+
+    return {
+        categoryMode: payee?.categoryMode ?? 'history',
+        categoryId:
+            payee?.categoryId ?? (state.inflowToRta ? null : state.categoryId),
+        rules: payee?.rules ?? [],
+        applyToExisting: true,
+    };
+}
+
+/** One line telling how the chosen payee categorizes and renames. */
+function payeeSummary(state: EditorState, pickers: TransactionPickers): string {
+    const payee = chosenPayee(state, pickers);
+
+    if (!payee) {
+        return t('New payee');
+    }
+
+    const categorization =
+        payee.categoryMode === 'none'
+            ? t('No categorization')
+            : payee.categoryMode === 'fixed' && payee.categoryId !== null
+              ? t('Always :category', {
+                    category: categoryLabel(
+                        { categoryId: payee.categoryId, inflowToRta: false },
+                        pickers,
+                    ),
+                })
+              : t('From the last transaction');
+
+    return payee.rules.length > 0
+        ? `${categorization} · ${t('contains :texts', {
+              texts: payee.rules
+                  .map((rule) => t('“:name”', { name: rule }))
+                  .join(', '),
+          })}`
+        : categorization;
 }
 
 /** Signed amount in cents typed in the main field; null when invalid. */
@@ -168,6 +225,8 @@ export function TransactionEditor({
     const [state, setState] = useState(() =>
         initialState(transaction, accountId, pickers),
     );
+    const [payeeSettings, setPayeeSettings] =
+        useState<OpenPayeeSettings | null>(null);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [processing, setProcessing] = useState(false);
 
@@ -185,11 +244,18 @@ export function TransactionEditor({
         isTransfer && !!account?.onBudget && !transferAccount.onBudget;
     const needsCategory = !!account?.onBudget && (!isTransfer || leavesBudget);
 
-    const payeeRenamed =
-        !!transaction?.imported &&
-        !isTransfer &&
-        state.payeeName.trim() !== '' &&
-        state.payeeName.trim() !== (transaction.payee?.name ?? '');
+    const hasPayee = !isTransfer && state.payeeName.trim() !== '';
+
+    const openPayeeSettings = (from: EditorState) => {
+        const value = payeeSettingsOf(from, pickers);
+
+        setPayeeSettings({ value, initial: JSON.stringify(value) });
+    };
+
+    const payeeSettingsChanged =
+        hasPayee &&
+        payeeSettings !== null &&
+        JSON.stringify(payeeSettings.value) !== payeeSettings.initial;
 
     const amount = signedAmount(state.direction, state.amountText);
     const splitsTotal = (state.splits ?? []).reduce(
@@ -256,10 +322,19 @@ export function TransactionEditor({
             amount,
             cleared: state.cleared,
             splits: isTransfer ? [] : (splits ?? []),
-            rename_rule_contains:
-                payeeRenamed && state.createRule
-                    ? state.ruleContains.trim() || null
-                    : null,
+            payee_settings: payeeSettingsChanged
+                ? {
+                      category_mode: payeeSettings.value.categoryMode,
+                      category_id:
+                          payeeSettings.value.categoryMode === 'fixed'
+                              ? payeeSettings.value.categoryId
+                              : null,
+                      rules: payeeSettings.value.rules
+                          .map((rule) => rule.trim())
+                          .filter(Boolean),
+                      apply_to_existing: payeeSettings.value.applyToExisting,
+                  }
+                : null,
         };
 
         const options = {
@@ -298,7 +373,11 @@ export function TransactionEditor({
         );
     };
 
-    const errorMessages = Object.values(errors);
+    const errorMessages = Object.entries(errors)
+        .filter(
+            ([key]) => !(payeeSettings && key.startsWith('payee_settings.')),
+        )
+        .map(([, message]) => message);
 
     return (
         <Dialog open={open} onOpenChange={(next) => !next && onDone()}>
@@ -383,8 +462,8 @@ export function TransactionEditor({
                             pickers={pickers}
                             accountId={state.accountId}
                             autoFocus={!transaction}
-                            onChange={(payee, lastCategoryId) =>
-                                set({
+                            onChange={(payee, lastCategoryId) => {
+                                const changes = {
                                     ...payee,
                                     ...(lastCategoryId !== null &&
                                     state.categoryId === null &&
@@ -392,50 +471,73 @@ export function TransactionEditor({
                                     state.splits === null
                                         ? { categoryId: lastCategoryId }
                                         : {}),
-                                })
-                            }
+                                };
+
+                                set(changes);
+
+                                if (payeeSettings) {
+                                    openPayeeSettings({ ...state, ...changes });
+                                }
+                            }}
                         />
                     </Field>
 
-                    {payeeRenamed && (
-                        <div className="space-y-2 rounded-lg border border-dashed p-3 text-sm">
-                            <label className="flex items-center gap-2">
-                                <Checkbox
-                                    checked={state.createRule}
-                                    onCheckedChange={(checked) =>
-                                        set({ createRule: checked === true })
-                                    }
+                    {hasPayee && (
+                        <div className="rounded-lg border">
+                            <button
+                                type="button"
+                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
+                                aria-expanded={payeeSettings !== null}
+                                onClick={() =>
+                                    payeeSettings
+                                        ? setPayeeSettings(null)
+                                        : openPayeeSettings(state)
+                                }
+                            >
+                                <Settings2 className="size-4 shrink-0 text-muted-foreground" />
+                                <span className="shrink-0 font-medium">
+                                    {t('Payee settings')}
+                                </span>
+                                <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                                    {payeeSummary(state, pickers)}
+                                </span>
+                                <ChevronDown
+                                    className={cn(
+                                        'size-4 shrink-0 text-muted-foreground transition-transform',
+                                        payeeSettings && 'rotate-180',
+                                    )}
                                 />
-                                {t('Also rename the next imports')}
-                            </label>
-                            {state.createRule && (
-                                <div className="flex flex-wrap items-center gap-2 pl-6">
-                                    <span className="text-muted-foreground">
-                                        {t('If the label contains')}
-                                    </span>
-                                    <Input
-                                        aria-label={t('Label text')}
-                                        className="h-8 w-56"
-                                        value={state.ruleContains}
-                                        onChange={(event) =>
-                                            set({
-                                                ruleContains:
-                                                    event.target.value,
+                            </button>
+                            {payeeSettings && (
+                                <div className="space-y-5 border-t p-3">
+                                    <p className="text-xs text-muted-foreground">
+                                        {t(
+                                            'Applies to all the transactions of “:name”, saved with this one.',
+                                            { name: state.payeeName.trim() },
+                                        )}
+                                    </p>
+                                    <PayeeSettingsFields
+                                        value={payeeSettings.value}
+                                        onChange={(changes) =>
+                                            setPayeeSettings({
+                                                ...payeeSettings,
+                                                value: {
+                                                    ...payeeSettings.value,
+                                                    ...changes,
+                                                },
                                             })
                                         }
+                                        pickers={pickers}
+                                        errors={errors}
+                                        errorPrefix="payee_settings."
+                                        suggestedRule={
+                                            transaction?.imported
+                                                ? (transaction.payee?.name ??
+                                                  transaction.rawLabel)
+                                                : null
+                                        }
                                     />
-                                    <span className="text-muted-foreground">
-                                        →{' '}
-                                        {t('“:name”', {
-                                            name: state.payeeName.trim(),
-                                        })}
-                                    </span>
                                 </div>
-                            )}
-                            {transaction?.rawLabel && (
-                                <p className="pl-6 text-xs text-muted-foreground">
-                                    {t('Bank label:')} {transaction.rawLabel}
-                                </p>
                             )}
                         </div>
                     )}

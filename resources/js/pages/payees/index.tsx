@@ -1,21 +1,11 @@
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import {
-    Combine,
-    Minus,
-    Pencil,
-    Plus,
-    Search,
-    Trash2,
-    Wand2,
-} from 'lucide-react';
+import { Combine, Pencil, Search, Trash2, Wand2 } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useState } from 'react';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
-import {
-    CategoryPicker,
-    categoryLabel,
-} from '@/components/transactions/category-picker';
+import { categoryLabel } from '@/components/transactions/category-picker';
+import { PayeeSettingsFields } from '@/components/transactions/payee-settings-fields';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -32,7 +22,7 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { destroy, index, merge, update } from '@/routes/payees';
 import { index as renameRules } from '@/routes/rename-rules';
-import type { TransactionPickers } from '@/types';
+import type { CategoryMode, TransactionPickers } from '@/types';
 import { intlLocale, t, tc } from '@/lib/i18n';
 
 type Payee = {
@@ -44,28 +34,6 @@ type Payee = {
     rules: string[];
     lastUsed: string | null;
 };
-
-type CategoryMode = 'history' | 'fixed' | 'none';
-
-const categoryModes: { value: CategoryMode; label: string; hint: string }[] = [
-    {
-        value: 'history',
-        label: t('From the last transaction'),
-        hint: t(
-            'The category follows that of its last categorized transaction.',
-        ),
-    },
-    {
-        value: 'fixed',
-        label: t('Always this category'),
-        hint: t('Its new transactions always get the chosen category.'),
-    },
-    {
-        value: 'none',
-        label: t('Do not categorize'),
-        hint: t('Each transaction is categorized by hand.'),
-    },
-];
 
 type Props = {
     payees: Payee[];
@@ -104,10 +72,10 @@ function EditPayeeDialog({
     const { currentTeam } = usePage().props;
     const form = useForm({
         name: payee.name,
-        category_id: payee.categoryId,
-        category_mode: payee.categoryMode,
+        categoryMode: payee.categoryMode,
+        categoryId: payee.categoryId,
         rules: payee.rules,
-        apply_to_existing: true,
+        applyToExisting: true,
     });
     const taken = pickers.payees.some(
         (other) =>
@@ -115,19 +83,15 @@ function EditPayeeDialog({
             other.name.toLocaleLowerCase(intlLocale()) ===
                 form.data.name.trim().toLocaleLowerCase(intlLocale()),
     );
-    const errors = form.errors as Record<string, string | undefined>;
-
-    const setRule = (index: number, text: string) =>
-        form.setData(
-            'rules',
-            form.data.rules.map((rule, i) => (i === index ? text : rule)),
-        );
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
         form.transform((data) => ({
-            ...data,
+            name: data.name,
+            category_id: data.categoryId,
+            category_mode: data.categoryMode,
             rules: data.rules.map((rule) => rule.trim()).filter(Boolean),
+            apply_to_existing: data.applyToExisting,
         }));
         form.patch(
             update({ current_team: currentTeam!.slug, payee: payee.id }).url,
@@ -164,143 +128,14 @@ function EditPayeeDialog({
                         <InputError message={form.errors.name} />
                     </div>
 
-                    <fieldset className="grid gap-2">
-                        <legend className="mb-1.5 text-sm font-medium">
-                            {t('Categorization')}
-                        </legend>
-                        {categoryModes.map((mode) => (
-                            <label
-                                key={mode.value}
-                                className="flex cursor-pointer gap-3 text-sm"
-                            >
-                                <input
-                                    type="radio"
-                                    name="category_mode"
-                                    checked={
-                                        form.data.category_mode === mode.value
-                                    }
-                                    onChange={() =>
-                                        form.setData(
-                                            'category_mode',
-                                            mode.value,
-                                        )
-                                    }
-                                    className="mt-1 accent-foreground"
-                                />
-                                <span>
-                                    <span className="block">{mode.label}</span>
-                                    <span className="block text-xs text-muted-foreground">
-                                        {mode.hint}
-                                    </span>
-                                </span>
-                            </label>
-                        ))}
-                        {form.data.category_mode !== 'none' && (
-                            <div className="mt-1 grid gap-1.5 pl-6">
-                                <CategoryPicker
-                                    value={{
-                                        categoryId: form.data.category_id,
-                                        inflowToRta: false,
-                                    }}
-                                    onChange={(value) =>
-                                        form.setData(
-                                            'category_id',
-                                            value.inflowToRta
-                                                ? null
-                                                : value.categoryId,
-                                        )
-                                    }
-                                    pickers={pickers}
-                                    placeholder={t('No category')}
-                                />
-                                <InputError message={form.errors.category_id} />
-                            </div>
-                        )}
-                    </fieldset>
-
-                    <fieldset className="grid gap-2">
-                        <legend className="mb-0.5 text-sm font-medium">
-                            {t('Automatic renaming')}
-                        </legend>
-                        <p className="text-xs text-muted-foreground">
-                            {t(
-                                'Bank labels that contain this text get this payee, regardless of case. For example “ALDI” for all Aldi stores.',
-                            )}
-                        </p>
-                        {form.data.rules.map((rule, index) => (
-                            <div key={index} className="grid gap-1">
-                                <div className="flex items-center gap-2">
-                                    <span className="w-16 shrink-0 text-xs text-muted-foreground">
-                                        {t('Contains')}
-                                    </span>
-                                    <Input
-                                        aria-label={t('Label text')}
-                                        value={rule}
-                                        onChange={(event) =>
-                                            setRule(index, event.target.value)
-                                        }
-                                        className="h-8"
-                                        autoFocus={rule === ''}
-                                    />
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        className="size-8 shrink-0"
-                                        aria-label={t('Remove the rule')}
-                                        onClick={() =>
-                                            form.setData(
-                                                'rules',
-                                                form.data.rules.filter(
-                                                    (_, i) => i !== index,
-                                                ),
-                                            )
-                                        }
-                                    >
-                                        <Minus />
-                                    </Button>
-                                </div>
-                                <InputError
-                                    message={errors[`rules.${index}`]}
-                                />
-                            </div>
-                        ))}
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="justify-self-start"
-                            onClick={() =>
-                                form.setData('rules', [...form.data.rules, ''])
-                            }
-                        >
-                            <Plus />
-                            {t('Add a rule')}
-                        </Button>
-                    </fieldset>
-
-                    <label className="flex cursor-pointer items-start gap-3 rounded-lg bg-muted/50 p-3 text-sm">
-                        <Checkbox
-                            className="mt-0.5"
-                            checked={form.data.apply_to_existing}
-                            onCheckedChange={(value) =>
-                                form.setData(
-                                    'apply_to_existing',
-                                    value === true,
-                                )
-                            }
-                        />
-                        <span>
-                            <span className="block">
-                                {t('Apply to transactions already imported')}
-                            </span>
-                            <span className="block text-xs text-muted-foreground">
-                                {t(
-                                    'Renames those that match the rules and gives the category to those that have none.',
-                                )}
-                            </span>
-                        </span>
-                    </label>
+                    <PayeeSettingsFields
+                        value={form.data}
+                        onChange={(changes) =>
+                            form.setData((data) => ({ ...data, ...changes }))
+                        }
+                        pickers={pickers}
+                        errors={form.errors as Record<string, string>}
+                    />
 
                     <DialogFooter>
                         <DialogClose asChild>

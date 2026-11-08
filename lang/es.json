@@ -130,7 +130,6 @@
     "All targets are funded: set the rest aside.": "Todos los objetivos están financiados: aparta el resto.",
     "All transactions": "Todos",
     "Already have an account?": "¿Ya tienes cuenta?",
-    "Also rename the next imports": "Renombrar también las próximas importaciones",
     "Always :category": "Siempre :category",
     "Always this category": "Siempre esta categoría",
     "amount": "importe",
@@ -191,7 +190,6 @@
     "Bank balance": "Saldo en el banco",
     "Bank connections": "Conexiones bancarias",
     "Bank connections are not set up on this server yet: it needs an EnableBanking application.": "Las conexiones bancarias aún no están configuradas en este servidor: hace falta una aplicación de EnableBanking.",
-    "Bank label:": "Concepto del banco:",
     "Bank labels that contain a text get the chosen payee. To create a rule, rename the payee of an imported transaction.": "Los conceptos del banco que contienen un texto reciben el beneficiario elegido. Para crear una regla, renombra el beneficiario de un movimiento importado.",
     "Bank labels that contain this text get this payee, regardless of case. For example “ALDI” for all Aldi stores.": "Los conceptos bancarios que contienen este texto reciben este beneficiario, sin distinguir mayúsculas. Por ejemplo «ALDI» para todas las tiendas Aldi.",
     "Bank sync goes through EnableBanking, a licensed open banking provider. On your own instance, you register a free EnableBanking application once; then each member connects their own bank.": "La sincronización bancaria pasa por EnableBanking, un proveedor de open banking autorizado. En tu propia instancia, registras una vez una aplicación gratuita de EnableBanking; después, cada miembro conecta su propio banco.",
@@ -747,7 +745,6 @@
     "Reset to zero": "Puesta a cero",
     "Restaurants": "Restaurantes",
     "Resume": "Reanudar",
-    "Rule created: labels containing “:text” will be renamed.": "Regla creada: los conceptos que contengan «:text» se renombrarán.",
     "Rule deleted.": "Regla eliminada.",
     "Rule updated.": "Regla actualizada.",
     "Same as last month": "Igual que el mes pasado",
@@ -985,5 +982,9 @@
     "Zero-rate loan": "Préstamo a tipo cero",
     "{0} No category selected|{1} One category selected|[2,*] :count categories selected": "{0} Ninguna categoría seleccionada|{1} Una categoría seleccionada|[2,*] :count categorías seleccionadas",
     "“:name”": "«:name»",
-    "“Ready to Assign” is money waiting for a job": "«Listo para asignar» es dinero esperando un trabajo"
+    "“Ready to Assign” is money waiting for a job": "«Listo para asignar» es dinero esperando un trabajo",
+    "Payee settings": "Ajustes del beneficiario",
+    "New payee": "Nuevo beneficiario",
+    "Contains “:text”": "Contiene «:text»",
+    "Applies to all the transactions of “:name”, saved with this one.": "Se aplica a todas las operaciones de «:name», se guarda con esta."
 }

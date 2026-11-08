@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Transactions\ConfigurePayee;
 use App\Enums\PayeeCategoryMode;
 use App\Models\Payee;
 use App\Models\PayeeRenameRule;
@@ -50,7 +51,7 @@ class PayeeController extends Controller
      * Rename a payee, set how it categorizes and the bank labels it takes over.
      * A name already taken merges this payee into the one that has it.
      */
-    public function update(Request $request, Team $current_team, Payee $payee): RedirectResponse
+    public function update(Request $request, Team $current_team, Payee $payee, ConfigurePayee $configure): RedirectResponse
     {
         abort_if($payee->isTransfer(), 404);
 
@@ -70,7 +71,7 @@ class PayeeController extends Controller
             return back()->withErrors(['name' => __('This name is reserved for a transfer.')]);
         }
 
-        $kept = DB::transaction(function () use ($validated, $payee, $existing, $name) {
+        $kept = DB::transaction(function () use ($validated, $payee, $existing, $name, $configure) {
             if ($existing) {
                 $existing->update(['last_category_id' => $validated['category_id'] ?? $existing->last_category_id]);
                 $this->merge($payee, $existing);
@@ -85,13 +86,13 @@ class PayeeController extends Controller
             }
 
             if (isset($validated['rules'])) {
-                $this->syncRules($kept, $validated['rules']);
+                $configure->syncRules($kept, $validated['rules']);
             }
 
             return $kept;
         });
 
-        $changed = ($validated['apply_to_existing'] ?? false) ? $this->applyToExisting($kept) : 0;
+        $changed = ($validated['apply_to_existing'] ?? false) ? $configure->applyToExisting($kept) : 0;
 
         Inertia::flash('toast', ['type' => 'success', 'message' => match (true) {
             $existing !== null => __('Merged with “:name”.', ['name' => $kept->name]),
@@ -142,71 +143,6 @@ class PayeeController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Payee deleted.')]);
 
         return back();
-    }
-
-    /**
-     * Give the payee exactly these rename rules. A text already used by another
-     * payee's rule moves to this one.
-     *
-     * @param  list<string>  $texts
-     */
-    private function syncRules(Payee $payee, array $texts): void
-    {
-        $texts = array_values(array_unique(array_map('trim', $texts)));
-
-        PayeeRenameRule::query()->where('payee_id', $payee->id)->whereNotIn('contains', $texts)->delete();
-
-        foreach ($texts as $text) {
-            PayeeRenameRule::updateOrCreate(
-                ['team_id' => $payee->team_id, 'contains' => $text],
-                ['payee_id' => $payee->id],
-            );
-        }
-    }
-
-    /**
-     * Run the payee's rules on the transactions already imported, then give
-     * its default category to its transactions still without one. Payees the
-     * rules emptied are deleted.
-     *
-     * @return int How many transactions changed.
-     */
-    private function applyToExisting(Payee $payee): int
-    {
-        $previous = Transaction::query()
-            ->whereNotNull('raw_label')
-            ->where('payee_id', '!=', $payee->id)
-            ->pluck('payee_id', 'id');
-
-        $changed = 0;
-
-        foreach ($payee->renameRules()->get() as $rule) {
-            $changed += $rule->applyToExisting();
-        }
-
-        $categoryId = $payee->refresh()->defaultCategoryId();
-
-        if ($categoryId !== null) {
-            $changed += Transaction::query()
-                ->where('payee_id', $payee->id)
-                ->whereNull('category_id')
-                ->whereNull('transfer_pair_id')
-                ->where('inflow_to_rta', false)
-                ->whereDoesntHave('splits')
-                ->whereHas('account', fn ($query) => $query->where('on_budget', true))
-                ->update(['category_id' => $categoryId]);
-        }
-
-        Payee::query()
-            ->whereKey($previous->filter()->unique()->values())
-            ->whereKeyNot($payee->id)
-            ->whereNull('transfer_account_id')
-            ->doesntHave('transactions')
-            ->doesntHave('renameRules')
-            ->get()
-            ->each(fn (Payee $emptied) => $emptied->delete());
-
-        return $changed;
     }
 
     private function merge(Payee $source, Payee $into): void
