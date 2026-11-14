@@ -1172,5 +1172,13 @@
     "New payee": "Nouveau bénéficiaire",
     "Contains “:text”": "Contient « :text »",
     "Applies to all the transactions of “:name”, saved with this one.": "S’applique à toutes les opérations de « :name », enregistré avec celle-ci.",
-    "Also groups here: :names": "Regroupe aussi ici : :names"
+    "Also groups here: :names": "Regroupe aussi ici : :names",
+    "Could not load the transactions.": "Impossible de charger les opérations.",
+    "This changed since, nothing was undone.": "Ça a changé entre-temps, rien n’a été annulé.",
+    "Change undone.": "Modification annulée.",
+    "Change redone.": "Modification rétablie.",
+    "Nothing to undo.": "Rien à annuler.",
+    "Nothing to redo.": "Rien à rétablir.",
+    "Undo": "Annulation",
+    "Redo": "Rétablissement"
 }

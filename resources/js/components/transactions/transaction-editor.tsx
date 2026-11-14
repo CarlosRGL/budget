@@ -386,7 +386,7 @@ export function TransactionEditor({
                 data-test="transaction-editor"
             >
                 <form
-                    className="space-y-4"
+                    className="min-w-0 space-y-4"
                     onSubmit={(event) => {
                         event.preventDefault();
                         submit();

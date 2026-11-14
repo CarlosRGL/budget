@@ -39,7 +39,7 @@ export type MoneyMoveEnd = { id: number; name: string } | null;
 
 export type BudgetMoneyMove = {
     id: number;
-    kind: 'assign' | 'move' | 'auto_assign' | 'reset';
+    kind: 'assign' | 'move' | 'auto_assign' | 'reset' | 'undo' | 'redo';
     amount: number;
     /** null = Ready to Assign */
     from: MoneyMoveEnd;

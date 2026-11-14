@@ -16,6 +16,8 @@ const kindLabels: Record<BudgetMoneyMove['kind'], string> = {
     move: t('Move'),
     auto_assign: t('Automatic assignment'),
     reset: t('Reset to zero'),
+    undo: t('Undo'),
+    redo: t('Redo'),
 };
 
 const dateTime = new Intl.DateTimeFormat(intlLocale(), {

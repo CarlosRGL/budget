@@ -1,80 +1,84 @@
-import { Head, router, usePage } from '@inertiajs/react';
-import { Eye, EyeOff, FolderPlus, Search } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { budgetActions } from '@/components/budget/budget-actions';
-import { NameDialog } from '@/components/budget/budget-dialogs';
-import { BudgetHeader } from '@/components/budget/budget-header';
-import { BudgetTable } from '@/components/budget/budget-table';
-import { BulkBar } from '@/components/budget/bulk-bar';
-import { CategoryDetail } from '@/components/budget/category-detail';
-import { MonthSummary } from '@/components/budget/month-summary';
-import PendingInvitationsModal from '@/components/pending-invitations-modal';
-import { Badge } from '@/components/ui/badge';
+import { Head, router, usePage } from "@inertiajs/react";
+import { Eye, EyeOff, FolderPlus, Search } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { budgetActions } from "@/components/budget/budget-actions";
+import { NameDialog } from "@/components/budget/budget-dialogs";
+import { BudgetHeader } from "@/components/budget/budget-header";
+import { BudgetTable } from "@/components/budget/budget-table";
+import {
+    handleUndoShortcut,
+    snapshotOf,
+} from "@/components/budget/budget-undo";
+import { BulkBar } from "@/components/budget/bulk-bar";
+import { CategoryDetail } from "@/components/budget/category-detail";
+import { MonthSummary } from "@/components/budget/month-summary";
+import PendingInvitationsModal from "@/components/pending-invitations-modal";
+import { Badge } from "@/components/ui/badge";
 import {
     Sheet,
     SheetContent,
     SheetDescription,
     SheetTitle,
-} from '@/components/ui/sheet';
-import { useMediaQuery } from '@/hooks/use-media-query';
-import { Button } from '@/components/ui/button';
-import { locale, t } from '@/lib/i18n';
-import { cn } from '@/lib/utils';
-import { show } from '@/routes/budget';
-import type { DashboardInvitation } from '@/types';
+} from "@/components/ui/sheet";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import { Button } from "@/components/ui/button";
+import { locale, t } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
+import { show } from "@/routes/budget";
+import type { DashboardInvitation } from "@/types";
 import type {
     BudgetCategory,
     BudgetCategoryDetail,
     BudgetPageProps,
-} from '@/types/budget';
+} from "@/types/budget";
 
 type Props = BudgetPageProps & {
     pendingInvitations?: DashboardInvitation[];
 };
 
 type Filter =
-    | 'all'
-    | 'overspent'
-    | 'snoozed'
-    | 'underfunded'
-    | 'overfunded'
-    | 'available';
+    | "all"
+    | "overspent"
+    | "snoozed"
+    | "underfunded"
+    | "overfunded"
+    | "available";
 
 const filters: {
     key: Filter;
     label: string;
     matches: (category: BudgetCategory) => boolean;
 }[] = [
-    { key: 'all', label: t('All'), matches: () => true },
+    { key: "all", label: t("All"), matches: () => true },
     {
-        key: 'overspent',
-        label: t('Overspent'),
+        key: "overspent",
+        label: t("Overspent"),
         matches: (category) => category.available < 0,
     },
     {
-        key: 'snoozed',
-        label: t('Target snoozed'),
+        key: "snoozed",
+        label: t("Target snoozed"),
         matches: (category) => category.target?.snoozed === true,
     },
     {
-        key: 'underfunded',
-        label: t('Underfunded'),
+        key: "underfunded",
+        label: t("Underfunded"),
         matches: (category) => category.target?.underfunded === true,
     },
     {
-        key: 'overfunded',
-        label: t('Overfunded'),
+        key: "overfunded",
+        label: t("Overfunded"),
         matches: (category) => category.target?.overfunded === true,
     },
     {
-        key: 'available',
-        label: t('Money available'),
+        key: "available",
+        label: t("Money available"),
         matches: (category) => category.available > 0,
     },
 ];
 
 function selectedFromUrl(url: string): number | null {
-    const value = new URL(url, 'http://localhost').searchParams.get('category');
+    const value = new URL(url, "http://localhost").searchParams.get("category");
 
     return value ? Number(value) : null;
 }
@@ -98,16 +102,36 @@ export default function BudgetShow({
     pendingInvitations = [],
 }: Props) {
     const page = usePage();
-    const team = page.props.currentTeam?.slug ?? '';
-    const actions = useMemo(() => budgetActions(team, month), [team, month]);
+    const team = page.props.currentTeam?.slug ?? "";
+    // The values shown right now, for the changes that can be undone.
+    const shown = useRef({ month, groups });
+    useEffect(() => {
+        shown.current = { month, groups };
+    }, [month, groups]);
+    const actions = useMemo(
+        () =>
+            budgetActions(team, month, () =>
+                snapshotOf(shown.current.month, shown.current.groups),
+            ),
+        [team, month],
+    );
+
+    useEffect(() => {
+        const onKeyDown = (event: KeyboardEvent) =>
+            handleUndoShortcut(event, team);
+
+        window.addEventListener("keydown", onKeyDown);
+
+        return () => window.removeEventListener("keydown", onKeyDown);
+    }, [team]);
 
     // The detail sits next to the table on wide screens, in a sheet otherwise.
-    const wide = useMediaQuery('(min-width: 1280px)');
+    const wide = useMediaQuery("(min-width: 1280px)");
     const [showInvitations, setShowInvitations] = useState(
         pendingInvitations.length > 0,
     );
-    const [filter, setFilter] = useState<Filter>('all');
-    const [search, setSearch] = useState('');
+    const [filter, setFilter] = useState<Filter>("all");
+    const [search, setSearch] = useState("");
     const [showHidden, setShowHidden] = useState(false);
     const [newGroupOpen, setNewGroupOpen] = useState(false);
     const [checked, setChecked] = useState<number[]>([]);
@@ -138,7 +162,7 @@ export default function BudgetShow({
     useEffect(() => {
         if (selectedId !== null && selectedDetail === null) {
             router.reload({
-                only: ['detail'],
+                only: ["detail"],
                 data: { category: selectedId },
             });
         }
@@ -149,12 +173,12 @@ export default function BudgetShow({
         const url = new URL(window.location.href);
 
         if (categoryId === null) {
-            url.searchParams.delete('category');
+            url.searchParams.delete("category");
         } else {
-            url.searchParams.set('category', String(categoryId));
+            url.searchParams.set("category", String(categoryId));
         }
 
-        window.history.replaceState(window.history.state, '', url);
+        window.history.replaceState(window.history.state, "", url);
     };
 
     const hiddenCount = groups.reduce(
@@ -169,7 +193,7 @@ export default function BudgetShow({
 
     const activeFilter = filters.find((candidate) => candidate.key === filter)!;
     const query = search.trim().toLocaleLowerCase(locale());
-    const filtering = filter !== 'all' || query !== '';
+    const filtering = filter !== "all" || query !== "";
 
     const visibleGroups = groups
         .filter((group) => showHidden || !group.hidden)
@@ -179,7 +203,7 @@ export default function BudgetShow({
                 (category) =>
                     (showHidden || !category.hidden) &&
                     activeFilter.matches(category) &&
-                    (query === '' ||
+                    (query === "" ||
                         category.name
                             .toLocaleLowerCase(locale())
                             .includes(query) ||
@@ -201,7 +225,7 @@ export default function BudgetShow({
 
     return (
         <>
-            <Head title={t('Budget')} />
+            <Head title={t("Budget")} />
             <PendingInvitationsModal
                 invitations={pendingInvitations}
                 open={pendingInvitations.length > 0 && showInvitations}
@@ -228,13 +252,13 @@ export default function BudgetShow({
                                 size="sm"
                                 variant={
                                     filter === candidate.key
-                                        ? 'secondary'
-                                        : 'ghost'
+                                        ? "secondary"
+                                        : "ghost"
                                 }
                                 className={cn(
-                                    'shrink-0',
+                                    "shrink-0",
                                     filter !== candidate.key &&
-                                        'text-muted-foreground',
+                                        "text-muted-foreground",
                                 )}
                                 onClick={() => setFilter(candidate.key)}
                             >
@@ -242,10 +266,10 @@ export default function BudgetShow({
                                 {!!counts[candidate.key] && (
                                     <Badge
                                         className={cn(
-                                            'h-5 px-1.5',
-                                            candidate.key === 'overspent'
-                                                ? 'bg-red-500 text-white'
-                                                : 'bg-amber-400 text-amber-950',
+                                            "h-5 px-1.5",
+                                            candidate.key === "overspent"
+                                                ? "bg-red-500 text-white"
+                                                : "bg-amber-400 text-amber-950",
                                         )}
                                     >
                                         {counts[candidate.key]}
@@ -259,8 +283,8 @@ export default function BudgetShow({
                             <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
                             <input
                                 type="search"
-                                aria-label={t('Search for a category')}
-                                placeholder={t('Search…')}
+                                aria-label={t("Search for a category")}
+                                placeholder={t("Search…")}
                                 value={search}
                                 onChange={(event) =>
                                     setSearch(event.target.value)
@@ -278,8 +302,8 @@ export default function BudgetShow({
                                 {showHidden ? <EyeOff /> : <Eye />}
                                 <span className="max-sm:sr-only">
                                     {showHidden
-                                        ? t('Hide hidden categories')
-                                        : t('Hidden (:count)', {
+                                        ? t("Hide hidden categories")
+                                        : t("Hidden (:count)", {
                                               count: hiddenCount,
                                           })}
                                 </span>
@@ -296,7 +320,7 @@ export default function BudgetShow({
                             onClick={() => setNewGroupOpen(true)}
                         >
                             <FolderPlus />
-                            <span className="max-sm:sr-only">{t('Group')}</span>
+                            <span className="max-sm:sr-only">{t("Group")}</span>
                         </Button>
                     </div>
                 </div>
@@ -304,18 +328,18 @@ export default function BudgetShow({
                 <div
                     key={month}
                     className={cn(
-                        'fx-swap grid items-start gap-4',
-                        wide && 'grid-cols-[minmax(0,1fr)_22rem]',
+                        "fx-swap grid items-start gap-4",
+                        wide && "grid-cols-[minmax(0,1fr)_22rem]",
                     )}
                 >
                     {groups.length === 0 ? (
                         <div className="rounded-xl border border-dashed p-10 text-center">
                             <p className="font-medium">
-                                {t('No categories yet.')}
+                                {t("No categories yet.")}
                             </p>
                             <p className="mt-1 text-sm text-muted-foreground">
                                 {t(
-                                    'Start with a group (“Everyday spending”, “Bills”…), then add your envelopes to it.',
+                                    "Start with a group (“Everyday spending”, “Bills”…), then add your envelopes to it.",
                                 )}
                             </p>
                             <Button
@@ -323,12 +347,13 @@ export default function BudgetShow({
                                 onClick={() => setNewGroupOpen(true)}
                             >
                                 <FolderPlus />
-                                {t('Create a group')}
+                                {t("Create a group")}
                             </Button>
                         </div>
                     ) : (
                         <BudgetTable
                             team={team}
+                            month={month}
                             groups={visibleGroups}
                             allGroups={groups}
                             readyToAssign={readyToAssign}
@@ -382,10 +407,10 @@ export default function BudgetShow({
                     onOpenAutoFocus={(event) => event.preventDefault()}
                 >
                     <SheetTitle className="sr-only">
-                        {selected?.category.name ?? t('Category')}
+                        {selected?.category.name ?? t("Category")}
                     </SheetTitle>
                     <SheetDescription className="sr-only">
-                        {t('Category detail for this month')}
+                        {t("Category detail for this month")}
                     </SheetDescription>
                     {selected && (
                         <CategoryDetail
@@ -412,12 +437,12 @@ export default function BudgetShow({
             />
 
             <NameDialog
-                key={newGroupOpen ? 'new-group-open' : 'new-group'}
+                key={newGroupOpen ? "new-group-open" : "new-group"}
                 open={newGroupOpen}
                 onOpenChange={setNewGroupOpen}
-                title={t('New group')}
-                label={t('Group name')}
-                submitLabel={t('Create')}
+                title={t("New group")}
+                label={t("Group name")}
+                submitLabel={t("Create")}
                 onSubmit={(name, close) => actions.createGroup(name, close)}
             />
         </>
@@ -430,13 +455,13 @@ BudgetShow.layout = (props: {
 }) => ({
     breadcrumbs: [
         {
-            title: t('Budget'),
+            title: t("Budget"),
             href: props.currentTeam
                 ? show({
                       current_team: props.currentTeam.slug,
                       month: props.month,
                   })
-                : '/',
+                : "/",
         },
     ],
 });

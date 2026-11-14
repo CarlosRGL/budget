@@ -8,4 +8,6 @@ enum MoneyMoveKind: string
     case Move = 'move';
     case AutoAssign = 'auto_assign';
     case Reset = 'reset';
+    case Undo = 'undo';
+    case Redo = 'redo';
 }

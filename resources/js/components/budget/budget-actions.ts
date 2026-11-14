@@ -1,33 +1,35 @@
-import { router } from '@inertiajs/react';
-import type { VisitOptions } from '@inertiajs/core';
-import { toast } from 'sonner';
+import { router } from "@inertiajs/react";
+import type { VisitOptions } from "@inertiajs/core";
+import { toast } from "sonner";
 import {
     autoAssign as autoAssignRoute,
     order as orderRoute,
-} from '@/routes/budget';
-import { update as assignmentRoute } from '@/routes/budget/assignment';
+} from "@/routes/budget";
+import { update as assignmentRoute } from "@/routes/budget/assignment";
 import {
     destroy as destroyCategoryRoute,
     store as storeCategoryRoute,
     update as updateCategoryRoute,
-} from '@/routes/budget/categories';
+} from "@/routes/budget/categories";
 import {
     destroy as destroyGroupRoute,
     store as storeGroupRoute,
     update as updateGroupRoute,
-} from '@/routes/budget/groups';
-import { store as moveRoute } from '@/routes/budget/moves';
-import { update as noteRoute } from '@/routes/budget/note';
+} from "@/routes/budget/groups";
+import { store as moveRoute } from "@/routes/budget/moves";
+import { update as noteRoute } from "@/routes/budget/note";
 import {
     bulk as bulkSnoozeRoute,
     destroy as unsnoozeRoute,
     store as snoozeRoute,
-} from '@/routes/budget/snooze';
+} from "@/routes/budget/snooze";
 import {
     destroy as destroyTargetRoute,
     update as targetRoute,
-} from '@/routes/budget/target';
-import type { BudgetTarget } from '@/types/budget';
+} from "@/routes/budget/target";
+import type { BudgetPageProps, BudgetTarget } from "@/types/budget";
+import { record, snapshotOf } from "./budget-undo";
+import type { BudgetSnapshot } from "./budget-undo";
 
 /**
  * Every change made on the budget screen: they keep the page state (selected
@@ -47,20 +49,37 @@ const options = (extra: Partial<VisitOptions> = {}): Partial<VisitOptions> => ({
 });
 
 export type AutoAssignStrategy =
-    | 'underfunded'
-    | 'last_month'
-    | 'average'
-    | 'reset';
+    "underfunded" | "last_month" | "average" | "reset";
 
 export type TargetData = {
-    type: BudgetTarget['type'];
+    type: BudgetTarget["type"];
     amount: number;
     weekday: number | null;
     due_date: string | null;
-    repeat: 'yearly' | null;
+    repeat: "yearly" | null;
 };
 
-export function budgetActions(team: string, month: string) {
+/**
+ * `snapshot` gives the page's current values: the changes that can be undone
+ * compare it with the page they come back with.
+ */
+export function budgetActions(
+    team: string,
+    month: string,
+    snapshot: () => BudgetSnapshot,
+) {
+    const undoable = (onSuccess?: () => void): Partial<VisitOptions> => {
+        const before = snapshot();
+
+        return options({
+            onSuccess: (page) => {
+                const props = page.props as unknown as BudgetPageProps;
+                record(team, before, snapshotOf(props.month, props.groups));
+                onSuccess?.();
+            },
+        });
+    };
+
     return {
         assign(categoryId: number, amount: number) {
             router.put(
@@ -70,7 +89,7 @@ export function budgetActions(team: string, month: string) {
                     category: categoryId,
                 }).url,
                 { amount },
-                options(),
+                undoable(),
             );
         },
 
@@ -87,7 +106,7 @@ export function budgetActions(team: string, month: string) {
                     to_category_id: toCategoryId,
                     amount,
                 },
-                options({ onSuccess }),
+                undoable(onSuccess),
             );
         },
 
@@ -103,14 +122,14 @@ export function budgetActions(team: string, month: string) {
                     strategy,
                     ...(categoryIds ? { category_ids: categoryIds } : {}),
                 },
-                options({ onSuccess }),
+                undoable(onSuccess),
             );
         },
 
         saveMonthNote(note: string) {
             router.put(
                 noteRoute({ current_team: team, month }).url,
-                { note: note.trim() === '' ? null : note },
+                { note: note.trim() === "" ? null : note },
                 options(),
             );
         },
@@ -213,9 +232,9 @@ export function budgetActions(team: string, month: string) {
             }).url;
 
             if (snoozed) {
-                router.post(url, {}, options());
+                router.post(url, {}, undoable());
             } else {
-                router.delete(url, options());
+                router.delete(url, undoable());
             }
         },
 
@@ -227,7 +246,7 @@ export function budgetActions(team: string, month: string) {
             router.put(
                 bulkSnoozeRoute({ current_team: team, month }).url,
                 { category_ids: categoryIds, snoozed },
-                options({ onSuccess }),
+                undoable(onSuccess),
             );
         },
 

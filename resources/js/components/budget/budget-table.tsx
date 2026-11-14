@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import type { DragEvent } from 'react';
+import { ActivityPopover } from '@/components/budget/activity-popover';
 import { Money } from '@/components/money';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -34,6 +35,8 @@ import { DeleteCategoryDialog, NameDialog } from './budget-dialogs';
 
 type Props = {
     team: string;
+    /** The month shown, as `YYYY-MM`. */
+    month: string;
     /** Groups to show, already filtered. */
     groups: BudgetGroup[];
     /** Every group and category, in order, for moving money and reordering. */
@@ -93,6 +96,7 @@ function structure(groups: BudgetGroup[]) {
 
 export function BudgetTable({
     team,
+    month,
     groups,
     allGroups,
     readyToAssign,
@@ -632,16 +636,23 @@ export function BudgetTable({
                                             }
                                         />
                                     </span>
-                                    <Money
-                                        cents={category.activity}
-                                        plain
-                                        className={cn(
-                                            wide,
-                                            'text-right',
-                                            category.activity === 0 &&
-                                                'text-muted-foreground',
-                                        )}
-                                    />
+                                    <span className={cn(wide, 'text-right')}>
+                                        <ActivityPopover
+                                            team={team}
+                                            month={month}
+                                            categoryId={category.id}
+                                            activity={category.activity}
+                                        >
+                                            <Money
+                                                cents={category.activity}
+                                                plain
+                                                className={cn(
+                                                    category.activity === 0 &&
+                                                        'text-muted-foreground',
+                                                )}
+                                            />
+                                        </ActivityPopover>
+                                    </span>
                                     <span className="flex justify-end">
                                         <AvailablePill
                                             category={category}
