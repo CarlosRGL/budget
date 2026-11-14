@@ -178,6 +178,55 @@ class SyncBankConnectionTest extends TestCase
         $this->assertSame('7812', $transaction->card_suffix);
     }
 
+    public function test_a_booked_card_payment_takes_the_payee_of_its_booked_label(): void
+    {
+        $diy = Category::factory()->for($this->team)->create();
+        $brico = Payee::factory()->for($this->team)->create(['name' => 'Brico Centre', 'last_category_id' => $diy->id]);
+        PayeeRenameRule::create(['team_id' => $this->team->id, 'contains' => 'BRICO CENTRE CB', 'payee_id' => $brico->id]);
+
+        $this->import([$this->cardNotice()]);
+        $this->assertSame('BRICO CENTRE\VILLENEUVE\ FR', Transaction::sole()->payee?->name);
+
+        $this->import([$this->bookedCardPayment()]);
+
+        $transaction = Transaction::sole();
+        $this->assertSame($brico->id, $transaction->payee_id);
+        $this->assertSame($diy->id, $transaction->category_id);
+        $this->assertSame(1, Payee::count(), 'The payee of the notice, now unused, is deleted.');
+    }
+
+    public function test_a_payee_chosen_on_the_card_notice_is_kept_once_booked(): void
+    {
+        $brico = Payee::factory()->for($this->team)->create(['name' => 'Brico Centre']);
+        PayeeRenameRule::create(['team_id' => $this->team->id, 'contains' => 'BRICO CENTRE CB', 'payee_id' => $brico->id]);
+        $this->import([$this->cardNotice()]);
+        $chosen = Payee::factory()->for($this->team)->create(['name' => 'Bricolage']);
+        Transaction::sole()->update(['payee_id' => $chosen->id]);
+
+        $this->import([$this->bookedCardPayment()]);
+
+        $this->assertSame($chosen->id, Transaction::sole()->payee_id);
+    }
+
+    public function test_a_card_notice_still_listed_next_to_its_booking_is_not_imported_twice(): void
+    {
+        $this->import([$this->cardNotice()]);
+
+        $this->import([$this->cardNotice(), $this->bookedCardPayment()]);
+        $this->import([$this->cardNotice(), $this->bookedCardPayment()]);
+
+        $transaction = Transaction::sole();
+        $this->assertSame('B-BRICO', $transaction->external_id);
+        $this->assertSame(BankStatus::Booked, $transaction->bank_status);
+    }
+
+    public function test_a_card_notice_first_seen_next_to_its_booking_is_not_imported(): void
+    {
+        $this->import([$this->cardNotice(), $this->bookedCardPayment()]);
+
+        $this->assertSame(['B-BRICO'], Transaction::pluck('external_id')->all());
+    }
+
     public function test_a_pending_transaction_is_matched_within_five_days_only(): void
     {
         $this->import([$this->bank(['entry_reference' => 'PDNG-1', 'status' => 'PDNG', 'transaction_date' => '2026-10-20'])]);
@@ -399,6 +448,42 @@ class SyncBankConnectionTest extends TestCase
             'remittance_information' => ['CARTE 22/10/26 BONNEAU BOULANG CB*2594'],
             ...$overrides,
         ];
+    }
+
+    /**
+     * The card notice Boursorama lists while a payment is pending: its own id,
+     * and the merchant label of the card network.
+     *
+     * @return array<string, mixed>
+     */
+    private function cardNotice(): array
+    {
+        return $this->bank([
+            'entry_reference' => 'avis-0001',
+            'status' => 'PDNG',
+            'transaction_amount' => ['currency' => 'EUR', 'amount' => '19.80'],
+            'transaction_date' => '2026-10-27',
+            'booking_date' => null,
+            'value_date' => null,
+            'remittance_information' => ['BRICO CENTRE\VILLENEUVE\ FR'],
+        ]);
+    }
+
+    /**
+     * The same payment once booked, under another id and label.
+     *
+     * @return array<string, mixed>
+     */
+    private function bookedCardPayment(): array
+    {
+        return $this->bank([
+            'entry_reference' => 'B-BRICO',
+            'transaction_amount' => ['currency' => 'EUR', 'amount' => '19.80'],
+            'transaction_date' => '2026-10-27',
+            'booking_date' => '2026-10-29',
+            'value_date' => '2026-10-27',
+            'remittance_information' => ['CARTE 27/10/26 BRICO CENTRE CB*4321'],
+        ]);
     }
 
     private function fakeBank(): void

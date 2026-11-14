@@ -163,10 +163,10 @@ class BankSynchronizer
      */
     public function import(BankAccount $bankAccount, Account $account, array $apiTransactions, CarbonInterface $dateFrom): array
     {
-        $incoming = collect($apiTransactions)
+        $incoming = $this->withoutBookedNotices(collect($apiTransactions)
             ->map(fn (array $data) => BankTransaction::fromApi($data))
             ->filter(fn (?BankTransaction $transaction) => $transaction !== null && $transaction->date->gt($account->starting_date))
-            ->values();
+            ->values());
 
         $known = $this->importedTransactions($account, $incoming, $dateFrom);
         $claimed = [];
@@ -207,7 +207,7 @@ class BankSynchronizer
 
         foreach ($incoming as $index => $bankTransaction) {
             if (isset($matches[$index])) {
-                $counts['updated'] += (int) $this->update($matches[$index], $bankTransaction);
+                $counts['updated'] += (int) $this->update($matches[$index], $bankTransaction, $account);
             } else {
                 $this->create($bankAccount, $account, $bankTransaction);
                 $counts['created']++;
@@ -217,6 +217,40 @@ class BankSynchronizer
         $counts['flagged'] = $this->flagRemoved($known, $claimed, $dateFrom);
 
         return $counts;
+    }
+
+    /**
+     * Some banks (Boursorama) keep listing the card notice of a pending payment,
+     * under its own id and label, for a day or two after the payment is booked.
+     * A pending transaction with the amount and date of a booked one of the same
+     * list is that notice: it is left out, so the booked one takes over the
+     * transaction imported from it instead of coming as a second one.
+     *
+     * @param  Collection<int, BankTransaction>  $incoming
+     * @return Collection<int, BankTransaction>
+     */
+    private function withoutBookedNotices(Collection $incoming): Collection
+    {
+        $booked = $incoming->filter(fn (BankTransaction $transaction) => $transaction->status === BankStatus::Booked);
+        $paired = [];
+
+        return $incoming->reject(function (BankTransaction $transaction) use ($booked, &$paired) {
+            if ($transaction->status !== BankStatus::Pending) {
+                return false;
+            }
+
+            $twin = $booked->search(fn (BankTransaction $candidate, int $index) => ! isset($paired[$index])
+                && $candidate->amount === $transaction->amount
+                && $candidate->date->isSameDay($transaction->date));
+
+            if ($twin === false) {
+                return false;
+            }
+
+            $paired[$twin] = true;
+
+            return true;
+        })->values();
     }
 
     /**
@@ -247,8 +281,14 @@ class BankSynchronizer
      * category, memo, date) are kept; an approved transaction whose amount changed
      * goes back to the inbox.
      */
-    private function update(Transaction $transaction, BankTransaction $bankTransaction): bool
+    private function update(Transaction $transaction, BankTransaction $bankTransaction, Account $account): bool
     {
+        $previousPayeeId = $transaction->payee_id;
+
+        if ($bankTransaction->status === BankStatus::Booked && $transaction->bank_status === BankStatus::Pending) {
+            $this->followBookedLabel($transaction, $bankTransaction, $account);
+        }
+
         $transaction->fill([
             'external_id' => $bankTransaction->externalId ?? $transaction->external_id,
             'fingerprint' => $bankTransaction->fingerprint,
@@ -273,7 +313,49 @@ class BankSynchronizer
             $transaction->amount = $bankTransaction->amount;
         }
 
-        return $transaction->isDirty() && $transaction->save();
+        if (! $transaction->isDirty() || ! $transaction->save()) {
+            return false;
+        }
+
+        if ($transaction->payee_id !== $previousPayeeId) {
+            Payee::deleteUnused([$previousPayeeId]);
+        }
+
+        return true;
+    }
+
+    /**
+     * A pending card payment often carries another label than once booked (the
+     * card network's merchant name, or a cash machine code), so the rename rules
+     * may not have recognised it. Unless a member already reviewed it or chose
+     * its payee, it takes the payee of its booked label, and that payee's
+     * category when it still had the one of the first payee.
+     */
+    private function followBookedLabel(Transaction $transaction, BankTransaction $bankTransaction, Account $account): void
+    {
+        if ($transaction->isApproved() || $transaction->raw_label === null) {
+            return;
+        }
+
+        $automatic = $this->findPayee($account->team_id, $transaction->raw_label, BankLabel::clean($transaction->raw_label)['label']);
+
+        if ($automatic === null || $automatic->id !== $transaction->payee_id) {
+            return;
+        }
+
+        $payee = $this->payeeFor($account->team_id, $bankTransaction);
+
+        if ($payee->id === $automatic->id) {
+            return;
+        }
+
+        $transaction->payee_id = $payee->id;
+
+        $keepsAutomaticCategory = $transaction->category_id === null || $transaction->category_id === $automatic->defaultCategoryId();
+
+        if ($keepsAutomaticCategory && $transaction->transfer_pair_id === null && ! $transaction->inflow_to_rta && ! $transaction->splits()->exists()) {
+            $transaction->category_id = $account->on_budget ? $payee->defaultCategoryId() : null;
+        }
     }
 
     private function create(BankAccount $bankAccount, Account $account, BankTransaction $bankTransaction): void
@@ -304,17 +386,29 @@ class BankSynchronizer
      */
     private function payeeFor(int $teamId, BankTransaction $bankTransaction): Payee
     {
+        return $this->findPayee($teamId, $bankTransaction->rawLabel, $bankTransaction->label)
+            ?? Payee::withoutGlobalScope(CurrentTeamScope::class)->create([
+                'team_id' => $teamId,
+                'name' => mb_substr($bankTransaction->label, 0, 255),
+            ]);
+    }
+
+    /**
+     * The payee the import gives to a label, if it already exists.
+     */
+    private function findPayee(int $teamId, string $rawLabel, string $label): ?Payee
+    {
         $rule = PayeeRenameRule::withoutGlobalScope(CurrentTeamScope::class)
             ->with('payee')
             ->where('team_id', $teamId)
             ->orderBy('id')
             ->get()
-            ->first(fn (PayeeRenameRule $rule) => $rule->matches($bankTransaction->rawLabel));
+            ->first(fn (PayeeRenameRule $rule) => $rule->matches($rawLabel));
 
-        return $rule->payee ?? Payee::withoutGlobalScope(CurrentTeamScope::class)->firstOrCreate([
-            'team_id' => $teamId,
-            'name' => mb_substr($bankTransaction->label, 0, 255),
-        ]);
+        return $rule->payee ?? Payee::withoutGlobalScope(CurrentTeamScope::class)
+            ->where('team_id', $teamId)
+            ->where('name', mb_substr($label, 0, 255))
+            ->first();
     }
 
     /**
