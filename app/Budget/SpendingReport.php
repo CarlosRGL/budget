@@ -3,19 +3,22 @@
 namespace App\Budget;
 
 use App\Models\Account;
+use App\Models\Payee;
 use App\Models\Team;
 use App\Models\Transaction;
 use App\Models\TransactionSplit;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Figures of the statistics page, on budget accounts and with the budget's
  * rules (BudgetCalculator): spending is the net activity of each category
  * (refunds lower it), income is what went to Ready to Assign, by payee.
  * Starting balances are neither, and transfers between budget accounts are
- * not spending.
+ * not spending. Spending by payee splits the same figures (categorized and
+ * uncategorized) by who was paid.
  */
 class SpendingReport
 {
@@ -25,6 +28,7 @@ class SpendingReport
      *     spending: list<array{categoryId: int, month: string, amount: int}>,
      *     uncategorized: array<string, int>,
      *     income: list<array{payee: string, month: string, amount: int}>,
+     *     payees: list<array{payeeId: int|null, payee: string, month: string, amount: int, count: int}>,
      * }
      */
     public function forPeriod(Team $team, CarbonImmutable $from, CarbonImmutable $to, ?array $accountIds = null): array
@@ -37,10 +41,19 @@ class SpendingReport
         $budgetAccounts = Account::withoutGlobalScopes()->where('team_id', $team->id)->where('on_budget', true)->pluck('id');
         $period = [$from->startOfMonth()->toDateString(), $to->endOfMonth()->toDateString()];
 
+        $uncategorized = $this->uncategorizedRows($team, $accounts, $budgetAccounts, $period);
+
+        $totals = [];
+        foreach ($uncategorized as $row) {
+            $month = substr((string) $row->date, 0, 7);
+            $totals[$month] = ($totals[$month] ?? 0) - (int) $row->amount;
+        }
+
         return [
             'spending' => $this->spending($team, $accounts, $period),
-            'uncategorized' => $this->uncategorized($team, $accounts, $budgetAccounts, $period),
+            'uncategorized' => $totals,
             'income' => $this->income($team, $accounts, $period),
+            'payees' => $this->payees($team, $accounts, $period, $uncategorized),
         ];
     }
 
@@ -88,16 +101,16 @@ class SpendingReport
     }
 
     /**
-     * Spending that reached no envelope yet (see BudgetCalculator::uncategorizedActivity).
+     * Transactions that reached no envelope yet (see BudgetCalculator::uncategorizedActivity).
      *
      * @param  Collection<int, int>  $accounts
      * @param  Collection<int, int>  $budgetAccounts
      * @param  array{string, string}  $period
-     * @return array<string, int> month => cents spent
+     * @return Collection<int, \stdClass> rows of id, payee_id, date and amount
      */
-    private function uncategorized(Team $team, Collection $accounts, Collection $budgetAccounts, array $period): array
+    private function uncategorizedRows(Team $team, Collection $accounts, Collection $budgetAccounts, array $period): Collection
     {
-        $rows = Transaction::withoutGlobalScopes()
+        return Transaction::withoutGlobalScopes()
             ->where('team_id', $team->id)
             ->whereIn('account_id', $accounts)
             ->whereBetween('date', $period)
@@ -111,15 +124,70 @@ class SpendingReport
                     ->withoutGlobalScopes()
                     ->whereNotIn('account_id', $budgetAccounts)))
             ->toBase()
-            ->get(['date', 'amount']);
+            ->get(['id', 'payee_id', 'date', 'amount']);
+    }
 
+    /**
+     * Spending of the period by payee and month, categorized or not: a split
+     * line counts for its own payee when it has one, else the transaction's.
+     * Refunds lower the spending of their payee.
+     *
+     * @param  Collection<int, int>  $accounts
+     * @param  array{string, string}  $period
+     * @param  Collection<int, \stdClass>  $uncategorized
+     * @return list<array{payeeId: int|null, payee: string, month: string, amount: int, count: int}>
+     */
+    private function payees(Team $team, Collection $accounts, array $period, Collection $uncategorized): array
+    {
+        $direct = Transaction::withoutGlobalScopes()
+            ->where('team_id', $team->id)
+            ->whereIn('account_id', $accounts)
+            ->whereNotNull('category_id')
+            ->whereBetween('date', $period)
+            ->toBase()
+            ->get(['id', 'payee_id', 'date', 'amount']);
+
+        $splits = TransactionSplit::query()
+            ->join('transactions', 'transactions.id', '=', 'transaction_splits.transaction_id')
+            ->where('transactions.team_id', $team->id)
+            ->whereIn('transactions.account_id', $accounts)
+            ->whereNotNull('transaction_splits.category_id')
+            ->whereBetween('transactions.date', $period)
+            ->toBase()
+            ->get([
+                'transactions.id as id',
+                DB::raw('COALESCE(transaction_splits.payee_id, transactions.payee_id) as payee_id'),
+                'transactions.date as date',
+                'transaction_splits.amount as amount',
+            ]);
+
+        /** @var array<string, array{amount: int, transactions: array<int, true>}> $totals */
         $totals = [];
-        foreach ($rows as $row) {
-            $month = substr((string) $row->date, 0, 7);
-            $totals[$month] = ($totals[$month] ?? 0) - (int) $row->amount;
+        foreach ($direct->concat($splits)->concat($uncategorized) as $row) {
+            $key = ($row->payee_id ?? '').'|'.substr((string) $row->date, 0, 7);
+            $totals[$key]['amount'] = ($totals[$key]['amount'] ?? 0) - (int) $row->amount;
+            $totals[$key]['transactions'][(int) $row->id] = true;
         }
 
-        return $totals;
+        $names = Payee::withoutGlobalScopes()
+            ->where('team_id', $team->id)
+            ->whereIn('id', array_filter(array_map(fn (string $key) => (int) explode('|', $key)[0], array_keys($totals))))
+            ->pluck('name', 'id');
+
+        $rows = [];
+        foreach ($totals as $key => $total) {
+            [$payeeId, $month] = explode('|', $key);
+            $payeeId = $payeeId === '' ? null : (int) $payeeId;
+            $rows[] = [
+                'payeeId' => $payeeId,
+                'payee' => $payeeId === null ? __('No payee') : (string) ($names[$payeeId] ?? __('No payee')),
+                'month' => $month,
+                'amount' => $total['amount'],
+                'count' => count($total['transactions']),
+            ];
+        }
+
+        return $rows;
     }
 
     /**

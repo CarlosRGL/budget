@@ -17,6 +17,13 @@ export type StatsProps = {
     spending: Array<{ categoryId: number; month: string; amount: number }>;
     uncategorized: Record<string, number>;
     income: Array<{ payee: string; month: string; amount: number }>;
+    payees: Array<{
+        payeeId: number | null;
+        payee: string;
+        month: string;
+        amount: number;
+        count: number;
+    }>;
 };
 
 /**

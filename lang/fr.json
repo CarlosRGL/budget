@@ -1180,5 +1180,11 @@
     "Nothing to undo.": "Rien à annuler.",
     "Nothing to redo.": "Rien à rétablir.",
     "Undo": "Annulation",
-    "Redo": "Rétablissement"
+    "Redo": "Rétablissement",
+    "No spending over the period.": "Aucune dépense sur la période.",
+    "Biggest payee": "Plus gros bénéficiaire",
+    "Search a payee": "Chercher un bénéficiaire",
+    "Average per month": "Moyenne par mois",
+    "No payee matches “:query”.": "Aucun bénéficiaire ne correspond à « :query ».",
+    "Show :count more payee|Show :count more payees": "Afficher :count bénéficiaire de plus|Afficher :count bénéficiaires de plus"
 }

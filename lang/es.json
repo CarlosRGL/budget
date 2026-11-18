@@ -995,5 +995,11 @@
     "Nothing to undo.": "Nada que deshacer.",
     "Nothing to redo.": "Nada que rehacer.",
     "Undo": "Deshacer",
-    "Redo": "Rehacer"
+    "Redo": "Rehacer",
+    "No spending over the period.": "Ningún gasto en el periodo.",
+    "Biggest payee": "Mayor beneficiario",
+    "Search a payee": "Buscar un beneficiario",
+    "Average per month": "Media mensual",
+    "No payee matches “:query”.": "Ningún beneficiario coincide con «:query».",
+    "Show :count more payee|Show :count more payees": "Mostrar :count beneficiario más|Mostrar :count beneficiarios más"
 }

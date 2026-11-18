@@ -71,6 +71,35 @@ class SpendingReportTest extends TestCase
         $this->assertSame([['payee' => 'Salaire Alex', 'month' => '2026-10', 'amount' => 245_000]], $report['income']);
     }
 
+    public function test_spending_by_payee_counts_categorized_split_and_uncategorized_spending(): void
+    {
+        $team = $this->user->currentTeam;
+        $market = Payee::factory()->for($team)->create(['name' => 'Marché']);
+        $pharmacy = Payee::factory()->for($team)->create(['name' => 'Pharmacie']);
+        $salary = Payee::factory()->for($team)->create(['name' => 'Salaire']);
+
+        Transaction::factory()->for($team)->for($this->checking)->create(['amount' => -5_000, 'date' => '2026-10-02', 'payee_id' => $market->id, 'category_id' => $this->courses->id]);
+        // A refund lowers the spending of its payee.
+        Transaction::factory()->for($team)->for($this->checking)->create(['amount' => 1_000, 'date' => '2026-10-03', 'payee_id' => $market->id, 'category_id' => $this->courses->id]);
+        // Not categorized yet: still spending.
+        Transaction::factory()->for($team)->for($this->checking)->create(['amount' => -700, 'date' => '2026-10-04', 'payee_id' => $market->id, 'category_id' => null]);
+        // A split line with its own payee counts for that payee.
+        $split = Transaction::factory()->for($team)->for($this->checking)->create(['amount' => -4_000, 'date' => '2026-10-05', 'payee_id' => $market->id, 'category_id' => null]);
+        $split->splits()->createMany([
+            ['category_id' => $this->courses->id, 'amount' => -3_000],
+            ['category_id' => $this->couches->id, 'payee_id' => $pharmacy->id, 'amount' => -1_000],
+        ]);
+        // Income is not spending.
+        Transaction::factory()->for($team)->for($this->checking)->inflowToReadyToAssign(200_000)->create(['date' => '2026-10-01', 'payee_id' => $salary->id]);
+
+        $report = app(SpendingReport::class)->forPeriod($team, CarbonImmutable::parse('2026-10-01'), CarbonImmutable::parse('2026-10-01'));
+
+        $this->assertEqualsCanonicalizing([
+            ['payeeId' => $market->id, 'payee' => 'Marché', 'month' => '2026-10', 'amount' => 7_700, 'count' => 4],
+            ['payeeId' => $pharmacy->id, 'payee' => 'Pharmacie', 'month' => '2026-10', 'amount' => 1_000, 'count' => 1],
+        ], $report['payees']);
+    }
+
     public function test_the_page_filters_the_period_and_the_accounts(): void
     {
         $team = $this->user->currentTeam;

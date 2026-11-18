@@ -3,6 +3,7 @@ import { ChevronDown, ChevronLeft, ChevronRight, Wallet } from 'lucide-react';
 import { useState } from 'react';
 import { IncomeExpense } from '@/components/stats/income-expense';
 import { SpendingBreakdown } from '@/components/stats/spending-breakdown';
+import { SpendingByPayee } from '@/components/stats/spending-by-payee';
 import { SpendingTrends } from '@/components/stats/spending-trends';
 import type { StatsProps } from '@/components/stats/stats-data';
 import { Button } from '@/components/ui/button';
@@ -19,11 +20,12 @@ import { t, tc } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 import { show } from '@/routes/stats';
 
-type Tab = 'trends' | 'breakdown' | 'income';
+type Tab = 'trends' | 'breakdown' | 'payees' | 'income';
 
 const tabs: Array<{ key: Tab; label: string }> = [
     { key: 'trends', label: t('Spending trends') },
     { key: 'breakdown', label: t('Breakdown') },
+    { key: 'payees', label: t('Payees') },
     { key: 'income', label: t('Income and spending') },
 ];
 
@@ -53,7 +55,7 @@ function tabFromUrl(url: string): Tab {
 }
 
 /**
- * Spending trends, breakdown and income versus expense over a range of months
+ * Spending trends, breakdown, spending by payee and income versus expense over a range of months
  * of the budget accounts.
  */
 export default function StatsShow(props: StatsProps) {
@@ -271,6 +273,7 @@ export default function StatsShow(props: StatsProps) {
                 {tab === 'breakdown' && (
                     <SpendingBreakdown key={props.to} {...props} />
                 )}
+                {tab === 'payees' && <SpendingByPayee {...props} />}
                 {tab === 'income' && <IncomeExpense {...props} />}
             </div>
         </>
